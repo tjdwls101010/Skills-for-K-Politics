@@ -131,7 +131,7 @@ class Test뷰게이트:
 
     def test_목록을_SCHEMA_에서_뽑는다(self):
         """⚠️ 손으로 적으면 뷰를 더한 날 그 뷰만 아무도 안 지킨다."""
-        assert set(audit._뷰이름들(db.SCHEMA)) == {"법률안제안주체", "의안회의"}
+        assert set(audit._뷰이름들(db.SCHEMA)) == {"법률안제안주체", "의안회의", "신선도"}
 
 
 class Test게이트_A9:

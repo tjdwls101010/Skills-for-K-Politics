@@ -253,6 +253,18 @@ CREATE VIEW 의안회의 AS
     FROM 의안 d JOIN 회의의안 h ON h.의안번호 = d.의안번호
                 JOIN 회의 m USING (회의id)
    WHERE d.대안의안번호 IS NOT NULL;
+
+DROP VIEW IF EXISTS 신선도;
+CREATE VIEW 신선도 AS
+  -- **이 답은 언제 기준인가.** 항상 한 행이다 — 빈 DB 에서도 값이 NULL 인 한 행이 온다.
+  -- 사용자가 "지금 어떻게 되어 있나"를 물을 때 그 '지금'이 며칠 전인지 모르면 낡은 시점의 답을 오늘 것인 양 내놓게 된다. 그래서 시점을 묻는 질의는 여기서 끝난다.
+  SELECT (SELECT MAX(수집시각) FROM 의안) AS 적재기준시각,  -- 마지막으로 자료를 받은 시각(KST). NULL = 받은 기록이 없다.
+         CASE WHEN g.상태 IS NULL THEN NULL WHEN g.상태 = '완료' AND COALESCE(g.건수, 0) = 0 THEN 1 ELSE 0 END AS 감사통과,  -- 1 = 게이트를 다 통과. NULL = 감사 기록 없음. **0 = 위반이 남아 있었다** — 이 DB 를 근거로 답할 때는 감사상세의 게이트가 무엇을 재는지 확인하거나, 못 하면 그 한계를 답에 밝힌다.
+         g.갱신일시 AS 감사시각,  -- ⚠️ **그 감사가 언제 것인가.** 감사는 수집이 돌 때만 기록되므로 수집이 며칠 멈췄으면 이 시각도 그만큼 옛것이고, 적재기준시각과 벌어져 있으면 그 사이의 적재는 감사를 안 거쳤다.
+         COALESCE(g.상세, CASE WHEN g.건수 > 0 THEN '게이트 위반 ' || g.건수 || '건' END) AS 감사상세,  -- 위반한 게이트와 건수. NULL = 위반 없음 또는 기록 없음.
+         (SELECT CASE WHEN COUNT(*) > 0 THEN '마지막 수집이 ' || group_concat(대상, '·') || ' 를 건너뛰었다 — 정당·현직여부·위원회 배정이 옛 값일 수 있다. 발의·표결·발언 이력은 영향받지 않는다.' END
+            FROM 수집상태 WHERE 상태 = '건너뜀') AS 경고  -- ⚠️ **어느 부분이 옛 값인가**를 문장으로. NULL = 그런 부분 없음.
+    FROM (SELECT 1) LEFT JOIN 수집상태 g ON g.대상 = '감사' AND g.키 = '전체';
 """
 
 
