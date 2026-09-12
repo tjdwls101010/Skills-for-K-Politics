@@ -51,7 +51,7 @@ def db_path(explicit: str | os.PathLike[str] | None = None) -> Path:
     if explicit:
         return Path(explicit)
     env = os.environ.get(DB_ENV)
-    return Path(env) if env else SKILL_DIR / "DBs" / "원천" / "국회.db"
+    return Path(env) if env else SKILL_DIR / "DBs" / "CONGRESS.db"
 
 
 SCHEMA = r"""
@@ -1323,7 +1323,7 @@ def _main(argv: list[str] | None = None) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(description=__doc__)
-    db도움 = f"DB 파일 경로. 기본값: ${DB_ENV} 또는 {{skill_dir}}/DBs/원천/국회.db"
+    db도움 = f"DB 파일 경로. 기본값: ${DB_ENV} 또는 {{skill_dir}}/DBs/CONGRESS.db"
     ap.add_argument("--db", help=db도움)
     명령들 = ap.add_subparsers(dest="command", required=True)
     schema = 명령들.add_parser(

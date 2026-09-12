@@ -1,6 +1,6 @@
 """국내 보도 코퍼스가 붙어 있나 — 심링크의 감시 검사.
 
-⚠️ **`뉴스.db` 는 다른 레포(Naver-News)의 실체를 가리키는 심링크다.** 우리는 그
+⚠️ **`NEWS.db` 는 다른 레포(Naver-News)의 실체를 가리키는 심링크다.** 우리는 그
 파일의 모양을 통제하지 못한다 — 저쪽이 스키마 주석을 다시 `CREATE` 문 **밖**으로
 빼거나 상수만 고치고 살아있는 카탈로그에 밀지 않으면, `SKILL.md`의 뉴스 조회 안내가
 **조용히 죽는다.** 산문은 안 깨지고 그냥 틀린 안내가 된다. 그래서 감시를 여기 1:1 로 단다.
@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 레포 = Path(__file__).resolve().parents[2]
-DB = 레포 / ".claude" / "skills" / "k-politics" / "DBs" / "뉴스.db"
+DB = 레포 / ".claude" / "skills" / "k-politics" / "DBs" / "NEWS.db"
 
 pytestmark = pytest.mark.skipif(
     not DB.exists(),

@@ -32,8 +32,8 @@ def 명령들(글: str) -> list[str]:
 
 @pytest.mark.parametrize(
     "이름,환경변수,DB",
-    [("국회", "CONGRESS_DB", ".claude/skills/k-politics/DBs/원천/국회.db"),
-     ("법령", "LAW_DB", ".claude/skills/k-politics/DBs/원천/법령.db")],
+    [("국회", "CONGRESS_DB", ".claude/skills/k-politics/DBs/CONGRESS.db"),
+     ("법령", "LAW_DB", ".claude/skills/k-politics/DBs/LAW.db")],
 )
 def test_수집이_운영_DB를_겨눈다(이름, 환경변수, DB):
     """레포 디렉터리를 옮긴 날 옛 절대경로를 계속 겨누면 수집은 DB 점검에서 멈춘다."""
@@ -308,8 +308,8 @@ def test_수집기_DB_경로가_env_에_박혀_있다(이름):
     import yaml
 
     잡 = yaml.safe_load(본문(수집들[이름]))["jobs"]["collect"]
-    for 키, 파일 in (("CONGRESS_DB", "국회.db"), ("LAW_DB", "법령.db")):
-        assert 잡["env"][키] == str(운영루트 / ".claude/skills/k-politics/DBs/원천" / 파일)
+    for 키, 파일 in (("CONGRESS_DB", "CONGRESS.db"), ("LAW_DB", "LAW.db")):
+        assert 잡["env"][키] == str(운영루트 / ".claude/skills/k-politics/DBs" / 파일)
 
 
 @pytest.mark.parametrize("이름", sorted(수집들))

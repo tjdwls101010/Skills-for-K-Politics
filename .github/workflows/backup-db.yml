@@ -49,8 +49,8 @@ jobs:
     env:
       # ⚠️ **체크아웃 안을 겨누지 마라.** `actions/checkout` 이 `git clean -ffdx` 를 도는데
       #    `-x` 가 gitignore 된 파일까지 지운다. DB 는 절대 경로가 겨눈다.
-      LAW_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/원천/법령.db
-      CONGRESS_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/원천/국회.db
+      LAW_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/LAW.db
+      CONGRESS_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/CONGRESS.db
       # 사다리는 내장 디스크(여유 135GiB), 반출은 iCloud 최신 2세대(잔여 24.2GiB).
       # 한 세대가 4.3GiB 라 사다리 전체는 iCloud 에 애초에 안 들어간다.
       CORPUS_BACKUP_DIR: /Users/seongjin/Library/Application Support/Congress-DB/백업

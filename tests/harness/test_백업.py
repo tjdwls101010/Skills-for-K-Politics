@@ -588,8 +588,8 @@ def test_워크플로가_체크아웃_밖의_DB_를_겨눈다():
 
 @pytest.mark.parametrize(
     "환경변수,상대경로",
-    [("LAW_DB", ".claude/skills/k-politics/DBs/원천/법령.db"),
-     ("CONGRESS_DB", ".claude/skills/k-politics/DBs/원천/국회.db")],
+    [("LAW_DB", ".claude/skills/k-politics/DBs/LAW.db"),
+     ("CONGRESS_DB", ".claude/skills/k-politics/DBs/CONGRESS.db")],
 )
 def test_백업이_현재_운영루트를_겨눈다(환경변수, 상대경로):
     """DB와 시크릿 검사가 같은 운영 레포를 봐야 경로 이동 뒤에도 함께 살아남는다."""
