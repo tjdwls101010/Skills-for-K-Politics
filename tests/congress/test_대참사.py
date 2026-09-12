@@ -15,15 +15,15 @@ import sqlite3
 
 import pytest
 
-import audit
-import db as dbmod
+from congress import audit
+from congress import db as dbmod
 
 import 백업픽스처
 
 
 @pytest.fixture
 def 백업마당(tmp_path, monkeypatch, db_path):
-    보관 = tmp_path / "백업"
+    보관 = tmp_path / "backup"
     보관.mkdir()
     monkeypatch.setenv("CORPUS_BACKUP_DIR", str(보관))
     return lambda **kw: 백업픽스처.세대만들기("congress", db_path, 보관, **kw)
@@ -205,7 +205,7 @@ class Test감사만_보는_호출도_판정을_낸다:
     안 듣는다면 게이트가 없는 것과 같다."""
 
     def test_게이트가_빨가면_1로_나간다(self, conn, db_path, monkeypatch):
-        import collect
+        from congress import collect
         conn.execute("INSERT INTO 수집실패 (대상종류, 대상키, 실패종류)"
                      " VALUES ('의안상세','2200001','막힘')")     # A4 를 빨갛게
         conn.commit()
@@ -213,7 +213,7 @@ class Test감사만_보는_호출도_판정을_낸다:
         assert collect._main() == 1
 
     def test_게이트가_초록이면_0으로_나간다(self, conn, db_path, monkeypatch):
-        import collect
+        from congress import collect
         _채운다(conn)
         monkeypatch.setattr("sys.argv", ["collect.py", "--db", str(db_path), "--audit-only"])
         assert collect._main() == 0
@@ -224,8 +224,8 @@ class Test감사판정이_DB_에_남는다:
     ms 단위 규율을 깬다. 수집기가 판정을 한 줄로 남겨야 훅이 그걸 읽는다."""
 
     def test_수집이_끝나면_판정이_남는다(self, conn, db_path, monkeypatch):
-        import collect
-        import net
+        from congress import collect
+        from congress import net
 
         class 빈원천:
             def __init__(self, *a, **k): pass

@@ -8,12 +8,12 @@
 
 from pathlib import Path
 
-import db
+from congress import db
 
 import 락계약
 
 
 class Test수집락(락계약.락계약):
-    모듈 = "db"
-    스크립트경로 = str(Path(db.__file__).resolve().parent)
+    모듈 = "congress.db"
+    스크립트경로 = str(Path(db.__file__).resolve().parents[1])
     락 = db.락

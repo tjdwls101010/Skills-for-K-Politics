@@ -15,11 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from 법제처 import 스키마
-from 법제처 import 연결
-from 법제처 import 이행
-from 법제처 import 저장
-from 법제처 import 정규화
+from law import schema as 스키마
+from law import conn as 연결
+from law import migrate as 이행
+from law import store as 저장
+from law import normalize as 정규화
 
 스키마v1 = (Path(__file__).parent / "fixtures" / "스키마v1.sql").read_text(encoding="utf-8")
 스키마v2 = (Path(__file__).parent / "fixtures" / "스키마v2.sql").read_text(encoding="utf-8")
@@ -457,7 +457,7 @@ class Test이행이_남기는_인터페이스:
     def test_중간에_죽어도_다시_돌리면_따라잡는다(self, v2, monkeypatch, 죽는곳, tmp_path):
         """⚠️ **"성공 후 두 번 돌리기"가 멱등이라고 "죽은 뒤 재실행"도 멱등인 것은 아니다.**
         이 둘은 다른 성질이고, 실제로 위험한 쪽은 뒤쪽이다 — 수집은 매일 자동으로 돌고
-        중단은 정상 사건이다(`수집.py` 가 종료코드 2 를 그 뜻으로 쓴다).
+        중단은 정상 사건이다(`collect.py` 가 종료코드 2 를 그 뜻으로 쓴다).
 
         맨손 SQL 로 짜면 여기서 깨진다: `DROP TABLE` 도 `DROP INDEX` 도 `DROP COLUMN` 도
         **두 번째 실행에서 예외를 던진다.** 그래서 단계마다 "이미 됐나"를 먼저 묻고,
@@ -554,7 +554,7 @@ def 백업마당(tmp_path, monkeypatch, db_path):
        문이 사본을 **실제로 열어 보는지**를 이 파일이 구별하지 못한다. 이유 전문은
        `tests/백업픽스처.py` 머리말에 있다.
     """
-    보관 = tmp_path / "백업"
+    보관 = tmp_path / "backup"
     보관.mkdir()
     monkeypatch.setenv("CORPUS_BACKUP_DIR", str(보관))
     return lambda **kw: 백업픽스처.세대만들기("law", db_path, 보관, **kw)

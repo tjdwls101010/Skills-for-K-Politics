@@ -8,7 +8,7 @@
 
 import pytest
 
-from 법제처 import 검증
+from law import verify as 검증
 
 
 class Test조문표본이_데이터다:
@@ -73,7 +73,7 @@ class Test필드모음:
 class Test기준선파일:
     def test_레포에_담겨_있고_정렬돼_있다(self):
         기준 = 검증.필드기준선()
-        assert 기준, "원천필드.json 이 비었다"
+        assert 기준, "source_fields.json 이 비었다"
         assert all(set(v) == {"항상", "가끔"} for v in 기준.values())
         assert all(칸 == sorted(칸) for v in 기준.values() for 칸 in v.values())
 

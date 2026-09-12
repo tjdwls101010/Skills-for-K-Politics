@@ -7,7 +7,7 @@
 
 import pytest
 
-import net
+from congress import net
 
 정상 = {
     "TVBPMBILL11": [

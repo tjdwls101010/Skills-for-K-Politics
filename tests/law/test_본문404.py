@@ -25,10 +25,10 @@ import sqlite3
 import pytest
 
 httpx = pytest.importorskip("httpx")
-루프 = pytest.importorskip("법제처.수집기.루프")
-스키마 = pytest.importorskip("법제처.스키마")
-원천 = pytest.importorskip("법제처.원천")
-저장 = pytest.importorskip("법제처.저장")
+루프 = pytest.importorskip("law.collectors.loop")
+스키마 = pytest.importorskip("law.schema")
+원천 = pytest.importorskip("law.source")
+저장 = pytest.importorskip("law.store")
 
 
 _본문응답 = {"PrecService": {"판례정보일련번호": "700", "사건번호": "2020다1"}}

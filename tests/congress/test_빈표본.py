@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-import verify
+from congress import verify
 
 SCRIPTS = Path(verify.__file__).resolve().parent
-법령검증 = SCRIPTS.parent / "법제처" / "검증.py"
+법령검증 = SCRIPTS.parent / "law" / "verify.py"
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +74,7 @@ class Test단언이_표본을_안_들고_all_을_쓰지_않는다:
 
     @pytest.mark.parametrize("경로", [
         pytest.param(SCRIPTS / "verify.py", id="국회 verify.py"),
-        pytest.param(법령검증, id="법령 검증.py"),
+        pytest.param(법령검증, id="법령 verify.py"),
     ])
     def test_표본을_도는_all_이_맨_단언에_안_남아있다(self, 경로):
         나쁜 = self._위반(경로)

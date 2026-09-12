@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-import db
+from congress import db
 
 
 _CHECK절 = "\n                        CHECK (제안자구분 IN ('의원','위원장','정부','의장','기타'))"

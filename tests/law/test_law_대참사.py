@@ -7,8 +7,8 @@
 
 import pytest
 
-from 법제처 import 감사
-from 법제처.수집기 import 실행
+from law import audit as 감사
+from law.collectors import run as 실행
 
 
 import 백업픽스처
@@ -16,7 +16,7 @@ import 백업픽스처
 
 @pytest.fixture
 def 백업마당(tmp_path, monkeypatch, db_path):
-    보관 = tmp_path / "백업"
+    보관 = tmp_path / "backup"
     보관.mkdir()
     monkeypatch.setenv("CORPUS_BACKUP_DIR", str(보관))
     return lambda **kw: 백업픽스처.세대만들기("law", db_path, 보관, **kw)

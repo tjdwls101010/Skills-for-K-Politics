@@ -4,8 +4,8 @@ import sqlite3
 
 import pytest
 
-import audit
-import db
+from congress import audit
+from congress import db
 
 
 class Test드리프트:

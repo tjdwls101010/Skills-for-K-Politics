@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-import db
+from congress import db
 
 
 @pytest.fixture

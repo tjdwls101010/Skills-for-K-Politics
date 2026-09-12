@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-from 법제처 import 이행
+from law import migrate as 이행
 
 # ⚠️ **날짜 리터럴을 미래로 가정하지 마라.** 형법의 실제 시행일 2026-09-13 을 박으면
 #    그날부터 이 파일이 **코드를 한 줄도 안 고쳤는데** 빨개진다. 뷰가 `date('now')` 를

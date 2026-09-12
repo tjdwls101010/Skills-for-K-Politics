@@ -1,4 +1,4 @@
-"""`Scripts/직결.py` — 자르지 않는 도구. seam: (payload) → 문자열 · (첨부 bytes) → 텍스트 · CLI.
+"""`Scripts/direct.py` — 자르지 않는 도구. seam: (payload) → 문자열 · (첨부 bytes) → 텍스트 · CLI.
 
 e2e(2026-09-10) 실측: `연혁본문` 225,871B 를 `[:200000]` 이 JSON 중간에서 끊어 파싱 불가(M4, Opus 복구
 10턴) · 별표는 링크만이라 Opus V7 이 37턴 동안 curl→PDF→HWP 를 손으로 팠다(M5). 원천 실측(2026-09-11):
@@ -18,13 +18,13 @@ from pathlib import Path
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts" / "법제처"
+SCRIPTS = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts" / "law"
 FX = Path(__file__).resolve().parent / "fixtures" / "직결"
 
-렌더러 = pytest.importorskip("법제처.직결.렌더러")
-from 법제처.수집기 import 법령
-첨부 = pytest.importorskip("법제처.직결.첨부")
-커맨드표 = pytest.importorskip("법제처.직결.커맨드표")
+렌더러 = pytest.importorskip("law.live.render")
+from law.collectors import statute as 법령
+첨부 = pytest.importorskip("law.live.attachment")
+커맨드표 = pytest.importorskip("law.live.commands")
 
 
 def _픽스처(이름):
@@ -225,7 +225,7 @@ class TestCLI:
         assert 코드 == 0 and json.loads(out) == p and out.count("\n") <= 1
 
     def test_help_가_새_커맨드와_인자를_진다(self):
-        r = subprocess.run([sys.executable, str(SCRIPTS / "직결.py"), "--help"], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(SCRIPTS / "direct.py"), "--help"], capture_output=True, text=True)
         assert r.returncode == 0
         for 말 in ("별표목록", "별표본문", "--조", "--부칙", "--별표", "--원본", "--저장", "--행정규칙일련번호"):
             assert 말 in r.stdout, 말
@@ -233,5 +233,5 @@ class TestCLI:
 
 
 def test_의존성에_pypdf_와_olefile_이_있다():
-    머리 = (SCRIPTS / "직결.py").read_text(encoding="utf-8").split('"""', 1)[0]
+    머리 = (SCRIPTS / "direct.py").read_text(encoding="utf-8").split('"""', 1)[0]
     assert "pypdf" in 머리 and "olefile" in 머리

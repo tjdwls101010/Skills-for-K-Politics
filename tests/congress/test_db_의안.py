@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import db
+from congress import db
 
 
 법률안 = {

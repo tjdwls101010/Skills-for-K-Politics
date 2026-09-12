@@ -14,10 +14,10 @@ import re
 
 import pytest
 
-스키마 = pytest.importorskip("법제처.스키마")
-심판례 = pytest.importorskip("법제처.수집기.심판례")
-연결 = pytest.importorskip("법제처.연결")
-이행 = pytest.importorskip("법제처.이행")
+스키마 = pytest.importorskip("law.schema")
+심판례 = pytest.importorskip("law.collectors.ruling")
+연결 = pytest.importorskip("law.conn")
+이행 = pytest.importorskip("law.migrate")
 
 
 def test_반각_대괄호() -> None:

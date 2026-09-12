@@ -2,7 +2,7 @@
 
 import pytest
 
-import bills
+from congress import bills
 
 # TVBPMBILL11 실제 응답 한 행(2201037, 소관위 원안가결). 필드명은 실측 24개 중 쓰는 것만.
 계류행 = {
@@ -51,7 +51,7 @@ class Test의안행:
 
     def test_쓰기_범위_밖_컬럼을_만들지_않는다(self):
         """`db.upsert_의안` 이 거부하므로 여기서 미리 맞춰 둔다."""
-        import db
+        from congress import db
 
         assert set(bills.의안행(계류행)) - {"의안번호"} <= set(
             db.의안_원천["TVBPMBILL11"].생성
@@ -173,7 +173,7 @@ class TestALLBILL:
 
         `db.upsert_의안` 이 갱신 범위로 막지만, 여기서도 본체 행의 값만 낸다.
         """
-        import db
+        from congress import db
 
         assert set(bills.allbill_의안행(self.본체)) - {"의안번호"} <= set(
             db.의안_원천["ALLBILL"].생성
@@ -188,7 +188,7 @@ class Test위원회_해소:
         `'기후위기 특별위원회'`(공백)로 같은 위원회를 다르게 적는다. `upsert_위원회` 가
         저장된 이름을 돌려주는데 **그 반환값을 안 쓰면 아무 소용이 없다.**
         """
-        import db
+        from congress import db
 
         db.upsert_위원회(conn, "기후위기특별위원회")  # 회의록 API 표기가 먼저 들어와 있다
         값 = {"소관위원회": "기후위기 특별위원회"}
@@ -204,7 +204,7 @@ class Test위원회_해소:
         """해소 없이 넣으면 `IntegrityError` 다 — 그게 실제로 일어난 일이다."""
         import sqlite3
 
-        import db
+        from congress import db
 
         db.upsert_위원회(conn, "기후위기특별위원회")
         db.upsert_의안(
@@ -275,7 +275,7 @@ class TestALLBILL_처리결과:
         """⚠️ **의안종류가 채워진 비법률안은 종전 조건으로는 다시 안 불렸다.** 첫 수집 뒤에
         본회의를 통과해도 처리결과가 영구히 NULL — 174건이 표결집계까지 있으면서 「계류」로
         읽혔다. 처리결과가 없는 비법률안은 다시 물어야 한다."""
-        import db
+        from congress import db
 
         db.upsert_위원회(conn, "예산결산특별위원회")
         db.upsert_의안(conn, "ALLBILL", {
@@ -308,7 +308,7 @@ class TestALLBILL_처리결과:
 
     def test_법률안의_처리결과는_ALLBILL_이_덮지_않는다(self, conn):
         """정본은 `TVBPMBILL11` 이다. 원천이 비어 온 날 가결이 NULL 로 되돌아가면 에러가 안 난다."""
-        import db
+        from congress import db
 
         db.upsert_위원회(conn, "정무위원회")
         db.upsert_의안(conn, "TVBPMBILL11", {
@@ -324,7 +324,7 @@ class TestALLBILL_처리결과:
 
     def test_가결된_비법률안은_다시_부르지_않는다(self, conn):
         """공포는 법률안에만 있다 — 「가결인데 공포 없음」을 비법률안까지 걸면 결의안이 매일 불린다."""
-        import db
+        from congress import db
 
         db.upsert_위원회(conn, "예산결산특별위원회")
         db.upsert_의안(conn, "ALLBILL", {

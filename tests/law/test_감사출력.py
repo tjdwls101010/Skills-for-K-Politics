@@ -1,4 +1,4 @@
-"""`감사.py` 가 화면에 내는 모양 — **여기가 아티팩트이자 요약의 원문이다.**
+"""`audit.py` 가 화면에 내는 모양 — **여기가 아티팩트이자 요약의 원문이다.**
 
 ⚠️ **이 파일은 리팩터 앞에 세우는 골든이다.** 곧 `_main` 의 출력부를 떼어내고
    `run(conn)` 을 한 번만 부르게 바꾸는데, 그 뒤에 이 검사를 쓰면 **이미 바뀐 출력을
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-감사 = pytest.importorskip("법제처.감사")
+감사 = pytest.importorskip("law.audit")
 
 
 

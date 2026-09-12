@@ -2,7 +2,7 @@
 
 import pytest
 
-import members
+from congress import members
 
 
 class Test의원_대수이력:
@@ -196,7 +196,7 @@ class Test의원위원회:
 def _오늘():
     from datetime import datetime
 
-    import db
+    from congress import db
 
     return datetime.now(db.KST).strftime("%Y-%m-%d")
 

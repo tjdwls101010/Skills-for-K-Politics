@@ -10,9 +10,9 @@
 
 import pytest
 
-from 법제처 import 이행
-from 법제처 import 정규화
-from 법제처.수집기 import 판례
+from law import migrate as 이행
+from law import normalize as 정규화
+from law.collectors import precedent as 판례
 
 
 class Test축약형을_편다:

@@ -13,8 +13,8 @@
 
 import pytest
 
-import db
-import meetings
+from congress import db
+from congress import meetings
 
 
 def 본문(회의id: int, class_id: int = 2) -> str:

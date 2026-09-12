@@ -10,7 +10,7 @@
 
 import pytest
 
-import meetings
+from congress import meetings
 
 
 class 물은연도만:

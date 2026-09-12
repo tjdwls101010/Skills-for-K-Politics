@@ -9,10 +9,10 @@
 
 import pytest
 
-import audit
-import collect
-import db
-import meetings
+from congress import audit
+from congress import collect
+from congress import db
+from congress import meetings
 
 from test_재시도큐 import 세는클라이언트, 열거행
 

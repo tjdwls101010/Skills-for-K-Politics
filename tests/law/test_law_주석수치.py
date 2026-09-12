@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from 법제처 import 스키마
+from law import schema as 스키마
 import 주석수치
 
 

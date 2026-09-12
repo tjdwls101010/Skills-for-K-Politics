@@ -11,7 +11,7 @@ def test_경고_주석이_전부_살아남는다(conn):
     congress 는 맨 위 `PRAGMA` 줄 하나가 예외지만 law 의 SCHEMA 에는 PRAGMA 가 없어
     **0건이 정답이다.**
     """
-    from 법제처 import 스키마
+    from law import schema as 스키마
 
     stored = "\n".join(
         r[0] for r in conn.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL")

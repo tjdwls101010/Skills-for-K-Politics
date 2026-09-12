@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-import audit
-import db
+from congress import audit
+from congress import db
 
 읽는순서 = [
     "의안", "의안심사", "발의자", "표결집계", "표결", "회의", "발언", "회의의안",

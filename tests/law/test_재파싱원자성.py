@@ -16,8 +16,8 @@ import sqlite3
 
 import pytest
 
-스키마 = pytest.importorskip("법제처.스키마")
-참조파서 = pytest.importorskip("법제처.참조파서")
+스키마 = pytest.importorskip("law.schema")
+참조파서 = pytest.importorskip("law.refparser")
 
 
 

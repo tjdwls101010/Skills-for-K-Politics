@@ -46,3 +46,6 @@ LAW.db
 
 # 세션 전사(기기 종속 심링크)
 .claude/histories
+
+# 코덱스 진입 규칙(기기 종속 심링크 → ~/.claude/CLAUDE.md)
+AGENTS.md

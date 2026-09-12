@@ -1,6 +1,6 @@
 """DB 락 — 계약은 `tests/락계약.py` 가 지고, 여기서는 배선만 잇는다.
 
-⚠️ 락은 `법제처/연결.py` 에 산다. `수집.py` 만 잠그던 시절에는 `법령.py` 같은 단독 실행이
+⚠️ 락은 `law/conn.py` 에 산다. `collect.py` 만 잠그던 시절에는 `statute.py` 같은 단독 실행이
 락 **밖에서** 스키마를 고쳤고, 예약 수집과 겹치면 두 프로세스가 동시에 `DROP COLUMN`
 과 테이블 재구축에 들어갈 수 있었다. **DB 를 고치는 경로는 전부 이걸 거친다.**
 
@@ -15,17 +15,17 @@ from pathlib import Path
 
 import pytest
 
-실행 = pytest.importorskip("법제처.수집기.실행")
-연결 = pytest.importorskip("법제처.연결")
-이행 = pytest.importorskip("법제처.이행")
-저장 = pytest.importorskip("법제처.저장")
+실행 = pytest.importorskip("law.collectors.run")
+연결 = pytest.importorskip("law.conn")
+이행 = pytest.importorskip("law.migrate")
+저장 = pytest.importorskip("law.store")
 
 import 락계약
 
 
 class Test수집락(락계약.락계약):
-    모듈 = "법제처.연결"
-    스크립트경로 = str(Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts" / "법제처")
+    모듈 = "law.conn"
+    스크립트경로 = str(Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts")
     락 = 연결.락
 
 

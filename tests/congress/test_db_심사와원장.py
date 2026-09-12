@@ -2,7 +2,7 @@
 
 import pytest
 
-import db
+from congress import db
 
 의안 = {
     "의안번호": "2213298",

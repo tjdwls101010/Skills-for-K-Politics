@@ -1,4 +1,4 @@
-"""`수집.py --결과` 가 남기는 곁기록 — **워크플로 요약이 읽는 유일한 구조화 출력이다.**
+"""`collect.py --결과` 가 남기는 곁기록 — **워크플로 요약이 읽는 유일한 구조화 출력이다.**
 
 ⚠️ **곁기록이 없는 종료 경로가 하나라도 있으면 그날 요약은 아무 말도 못 한다.** 그리고
    그런 날은 대개 뭔가 잘못된 날이다 — 인증이 깨졌거나, 원천이 흔들렸거나, 먼저 도는
@@ -15,11 +15,11 @@ import json
 
 import pytest
 
-from 법제처 import 감사
-실행 = pytest.importorskip("법제처.수집기.실행")
-연결 = pytest.importorskip("법제처.연결")
-원천 = pytest.importorskip("법제처.원천")
-이행 = pytest.importorskip("법제처.이행")
+from law import audit as 감사
+실행 = pytest.importorskip("law.collectors.run")
+연결 = pytest.importorskip("law.conn")
+원천 = pytest.importorskip("law.source")
+이행 = pytest.importorskip("law.migrate")
 
 
 

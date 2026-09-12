@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-import verify
+from congress import verify
 
 수집기 = Path(verify.__file__).resolve().parent
 
@@ -101,7 +101,7 @@ class Test기준선파일:
         """⚠️ **기준선은 커밋된 파일이라야 한다.** 실행 때마다 새로 만들면 비교 대상이
         자기 자신이 되어 어떤 변화도 안 잡힌다 — 그게 이 축이 고치려는 결함이다."""
         기준 = verify.필드기준선()
-        assert 기준, "원천필드.json 이 비었다"
+        assert 기준, "source_fields.json 이 비었다"
         assert all(set(v) == {"항상", "가끔"} for v in 기준.values())
 
     def test_기준선이_정렬돼_있다(self):

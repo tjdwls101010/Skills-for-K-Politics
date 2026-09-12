@@ -14,7 +14,7 @@
 
 import pytest
 
-import verify
+from congress import verify
 
 
 class Test본문표본이_데이터다:

@@ -1,4 +1,4 @@
-"""`판례.py` · `심판례.py` · `행정규칙.py` — 본문 파싱.
+"""`precedent.py` · `ruling.py` · `admrule.py` — 본문 파싱.
 
 **여기서 잠그는 것은 대부분 "필드 이름이 목록과 본문에서 갈리는" 자리다.** 한쪽 이름만
 쓰면 그 컬럼이 통째로 비는데, 수집은 성공하고 감사도 건수만 보면 초록이다.
@@ -6,13 +6,13 @@
 
 import pytest
 
-from 법제처.수집기 import 루프
-from 법제처.수집기 import 법령
-from 법제처.수집기 import 심판례
-from 법제처 import 저장
-from 법제처 import 정규화
-from 법제처.수집기 import 판례
-from 법제처.수집기 import 행정규칙
+from law.collectors import loop as 루프
+from law.collectors import statute as 법령
+from law.collectors import ruling as 심판례
+from law import store as 저장
+from law import normalize as 정규화
+from law.collectors import precedent as 판례
+from law.collectors import admrule as 행정규칙
 
 
 

@@ -1,4 +1,4 @@
-"""`감사.py` 의 뷰 게이트(A24)와 그 상세(R26).
+"""`audit.py` 의 뷰 게이트(A24)와 그 상세(R26).
 
 ⚠️ **깨진 뷰는 조회할 때야 터진다.** `PRAGMA integrity_check` 도 통과하고 `sqlite_master`
    에도 멀쩡히 앉아 있다 — 뷰가 가리키는 컬럼이 사라져도 SQLite 는 아무 말을 안 한다.
@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import pytest
 
-감사 = pytest.importorskip("법제처.감사")
-스키마 = pytest.importorskip("법제처.스키마")
+감사 = pytest.importorskip("law.audit")
+스키마 = pytest.importorskip("law.schema")
 
 
 _뷰 = ["현행법령", "시행대기법령", "시행예정법령", "의율판단", "현행조문",

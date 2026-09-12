@@ -2,7 +2,7 @@
 
 import pytest
 
-import meetings
+from congress import meetings
 
 열거행 = [
     {

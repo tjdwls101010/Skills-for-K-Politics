@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-참조파서 = pytest.importorskip("법제처.참조파서")
+참조파서 = pytest.importorskip("law.refparser")
 
 
 def 인용들(행들):

@@ -10,9 +10,9 @@
 
 import pytest
 
-import bills
-import db as dbmod
-import members
+from congress import bills
+from congress import db as dbmod
+from congress import members
 
 
 # ── 의원위원회 ───────────────────────────────────────────────────────────────
@@ -407,7 +407,7 @@ class Test발의자_비법률안_보정:
 
 def _게이트(conn, 코드):
     """`audit.py` 의 SQL 을 그대로 태운다 — 여기 복사본을 두면 게이트가 바뀔 때 갈린다."""
-    import audit
+    from congress import audit
     sql = next(s for 번호, _, s in audit.게이트 if 번호 == 코드)
     return conn.execute(sql).fetchone()[0] or 0
 
@@ -484,8 +484,8 @@ class Test불완전한목록의_종료코드:
     """
 
     def test_원천이_모자라게_주면_2로_나간다(self, db_path, monkeypatch):
-        import collect
-        import net
+        from congress import collect
+        from congress import net
 
         class 모자란원천:
             def __init__(self, *a, **k): pass
@@ -501,8 +501,8 @@ class Test불완전한목록의_종료코드:
         assert collect._main() == 2
 
     def test_트레이스백을_뱉지_않는다(self, db_path, monkeypatch, capsys):
-        import collect
-        import net
+        from congress import collect
+        from congress import net
 
         class 모자란원천:
             def __init__(self, *a, **k): pass
@@ -537,7 +537,7 @@ class Test게이트가_옛_DB_에서_안_죽는다:
         """**하나가 깨진 것과 전부를 모르는 것은 다르다.** 감사가 통째로 죽으면 나머지
         열두 게이트의 답도 못 듣는다 — 그게 이 검사가 지키는 것이다."""
         import sqlite3
-        import audit
+        from congress import audit
         빈 = sqlite3.connect(db_path)
         dbmod.init_schema(빈)
         빈.execute("DROP TABLE 수집상태")
@@ -601,7 +601,7 @@ class TestR14_는_지금을_기준으로_잰다:
     그 표는 실제로 며칠씩 낡는다 — **낡음을 재는 값이 낡음에 가려진다.**"""
 
     def test_옛_기록을_지금_기준으로_잰다(self, conn):
-        import audit
+        from congress import audit
         conn.execute(
             "INSERT INTO 수집상태 (대상, 키, 상태, 건수, 갱신일시, 상태시작일시)"
             " VALUES ('의원위원회','전체','건너뜀',0,"

@@ -16,8 +16,8 @@ import sqlite3
 
 import pytest
 
-from 법제처 import 스키마
-from 법제처 import 이행
+from law import schema as 스키마
+from law import migrate as 이행
 
 _c = sqlite3.connect(":memory:")
 미래 = _c.execute("SELECT date('now','localtime','+30 days')").fetchone()[0]

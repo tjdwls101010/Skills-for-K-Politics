@@ -2,7 +2,7 @@
 
 import pytest
 
-import bills
+from congress import bills
 
 
 class Test발의자:

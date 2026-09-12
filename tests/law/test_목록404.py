@@ -13,8 +13,8 @@ from __future__ import annotations
 import pytest
 
 httpx = pytest.importorskip("httpx")
-실행 = pytest.importorskip("법제처.수집기.실행")
-원천 = pytest.importorskip("법제처.원천")
+실행 = pytest.importorskip("law.collectors.run")
+원천 = pytest.importorskip("law.source")
 
 _목록응답 = {"LawSearch": {"totalCnt": "1", "law": [{"법령ID": "1", "법령일련번호": "9"}]}}
 

@@ -9,7 +9,7 @@ import sqlite3
 
 import pytest
 
-import db as dbmod
+from congress import db as dbmod
 
 
 def test_연결이_autocommit_이다(conn):

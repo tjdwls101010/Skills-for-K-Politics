@@ -11,9 +11,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from 법제처 import 스키마
+from law import schema as 스키마
 
-A0_스키마문자수 = 48953   # 2026-09-11 기준선: `적재.py schema` 출력 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
+A0_스키마문자수 = 48953   # 2026-09-11 기준선: `load.py schema` 출력 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
 
 
 def _주석줄들():

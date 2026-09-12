@@ -24,11 +24,11 @@ from pathlib import Path
 
 # ⚠️ **레포 루트를 `sys.path` 에 올리지 않는다** — 네 스킬의 `Scripts/` 이름이 겹쳐
 #    먼저 import 된 쪽이 다른 스킬의 테스트를 조용히 깨뜨린다. 파일 하나만 이름 붙여 올린다.
-if "백업" in sys.modules:
-    백업 = sys.modules["백업"]
+if "backup" in sys.modules:
+    백업 = sys.modules["backup"]
 else:
-    _명세 = importlib.util.spec_from_file_location("백업", 스킬 / "Scripts" / "백업.py")
-    sys.modules["백업"] = 백업 = importlib.util.module_from_spec(_명세)
+    _명세 = importlib.util.spec_from_file_location("backup", 스킬 / "Scripts" / "backup.py")
+    sys.modules["backup"] = 백업 = importlib.util.module_from_spec(_명세)
     _명세.loader.exec_module(백업)
 
 

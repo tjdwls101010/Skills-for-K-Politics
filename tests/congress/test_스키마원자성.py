@@ -19,7 +19,7 @@ import sqlite3
 
 import pytest
 
-db = pytest.importorskip("db")
+db = pytest.importorskip("congress.db")
 
 
 def _개체(conn) -> set:

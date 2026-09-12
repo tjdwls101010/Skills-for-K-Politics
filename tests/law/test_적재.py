@@ -1,16 +1,16 @@
-"""`적재.py` — 스키마 · 연결 · 쓰기 경로 · 마이그레이션."""
+"""`load.py` — 스키마 · 연결 · 쓰기 경로 · 마이그레이션."""
 
 import re
 import sqlite3
 
 import pytest
 
-from 법제처 import 감사
-from 법제처 import 스키마
-from 법제처 import 연결
-from 법제처 import 이행
-from 법제처 import 저장
-from 법제처 import 정규화
+from law import audit as 감사
+from law import schema as 스키마
+from law import conn as 연결
+from law import migrate as 이행
+from law import store as 저장
+from law import normalize as 정규화
 
 
 class Test스키마:
@@ -361,7 +361,7 @@ class Test감사가_빈DB를_잡는다:
 class Test드리프트:
     """**상수만 고치고 `migrate()` 를 안 돌리면 `.schema` 는 옛 주석을 그대로 내놓는다.**
 
-    끊어진 고리가 여기다 — 상수→DB 갱신은 `수집.py` 가 실행 중 `migrate()` 를 부르는 것이
+    끊어진 고리가 여기다 — 상수→DB 갱신은 `collect.py` 가 실행 중 `migrate()` 를 부르는 것이
     전부인데, 원천 진단이 빨가면 수집을 건너뛰어 `migrate()` 도 안 돈다. `.gitignore` 가
     DB 를 빼므로 CI 는 접근조차 못 한다. **아무 신호가 없다는 것이 문제의 전부다.**
     """

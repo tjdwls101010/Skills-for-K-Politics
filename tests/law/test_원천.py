@@ -1,4 +1,4 @@
-"""`원천.py` — 봉투 해석과 유량.
+"""`source.py` — 봉투 해석과 유량.
 
 **여기서 잠그는 것은 전부 "에러 없이 틀리는" 자리다.** 봉투 이름 하나가 어긋나면 그
 자료종류만 조용히 0건이 되고, 단수/복수 정규화가 빠지면 개발 중엔 안 터지고 운영에서
@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from 법제처 import 원천
+from law import source as 원천
 
 
 class Test봉투표:

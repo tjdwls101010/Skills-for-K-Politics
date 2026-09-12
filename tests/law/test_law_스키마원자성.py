@@ -19,8 +19,8 @@ import sqlite3
 
 import pytest
 
-스키마 = pytest.importorskip("법제처.스키마")
-이행 = pytest.importorskip("법제처.이행")
+스키마 = pytest.importorskip("law.schema")
+이행 = pytest.importorskip("law.migrate")
 
 
 def _개체(conn) -> set:

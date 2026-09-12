@@ -13,9 +13,9 @@ import json
 
 import pytest
 
-collect = pytest.importorskip("collect")
-dbmod = pytest.importorskip("db")
-net = pytest.importorskip("net")
+collect = pytest.importorskip("congress.collect")
+dbmod = pytest.importorskip("congress.db")
+net = pytest.importorskip("congress.net")
 
 
 class 빈원천:
@@ -105,7 +105,7 @@ def test_곁기록을_안_시키면_안_만든다(conn, db_path, tmp_path, monke
 def test_감사는_실행당_한_번만_돈다(돌린다, monkeypatch) -> None:
     """⚠️ **게이트 하나가 백만 행을 훑는다.** 두 번 도는 것은 그냥 두 배가 아니라,
     그 사이 DB 가 바뀌면 **화면에 낸 표와 곁기록의 값이 갈린다.**"""
-    import audit
+    from congress import audit
 
     센다 = []
     원래 = audit.run

@@ -20,16 +20,16 @@ import sqlite3
 
 import pytest
 
-from 법제처 import 감사
-루프 = pytest.importorskip("법제처.수집기.루프")
-실행 = pytest.importorskip("법제처.수집기.실행")
-from 법제처.수집기 import 법령
-스키마 = pytest.importorskip("법제처.스키마")
-from 법제처.수집기 import 심판례
-원천 = pytest.importorskip("법제처.원천")
-저장 = pytest.importorskip("법제처.저장")
-정리모듈 = pytest.importorskip("법제처.정리")
-from 법제처.수집기 import 판례
+from law import audit as 감사
+루프 = pytest.importorskip("law.collectors.loop")
+실행 = pytest.importorskip("law.collectors.run")
+from law.collectors import statute as 법령
+스키마 = pytest.importorskip("law.schema")
+from law.collectors import ruling as 심판례
+원천 = pytest.importorskip("law.source")
+저장 = pytest.importorskip("law.store")
+정리모듈 = pytest.importorskip("law.prune")
+from law.collectors import precedent as 판례
 
 
 
@@ -394,7 +394,7 @@ def test_이상_판정을_받은_목록도_기준선을_갈아_치우지_않는�
 
 
 def _게이트(conn, 코드):
-    """`감사.py` 의 SQL 을 그대로 돌린다. 식을 여기 다시 적으면 어긋난 쪽을 아무도 모른다."""
+    """`audit.py` 의 SQL 을 그대로 돌린다. 식을 여기 다시 적으면 어긋난 쪽을 아무도 모른다."""
 
 
     항목 = {c: (설명, sql) for c, 설명, sql in 감사.게이트 + 감사.보고}
@@ -489,7 +489,7 @@ def test_A11_은_법령ID_별로_센다() -> None:
 #
 # `수집루프` 검사는 목록을 손으로 만들어 넣는다. 여기서는 **원천이 반토막을 주는 상황**을
 # 목록 API 층에서 만들어, 수집기가 그것을 완결로 받아들이고도 지우지 않는지 본다.
-# `법령.py` 는 자기 손으로 지우던 경로라 이 확인이 특히 필요하다.
+# `statute.py` 는 자기 손으로 지우던 경로라 이 확인이 특히 필요하다.
 
 
 class 반토막원천:

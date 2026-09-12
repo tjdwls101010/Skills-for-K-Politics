@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-import db as dbmod
+from congress import db as dbmod
 
 import 백업픽스처
 
@@ -63,7 +63,7 @@ class Test유령방지:
 def 백업마당(tmp_path, monkeypatch, db_path):
     """`놓기(...)` — **진짜** 사본을 뜬 세대 하나. 가짜 바이트를 쓰지 않는 이유는
     `tests/백업픽스처.py` 머리말에 있다."""
-    보관 = tmp_path / "백업"
+    보관 = tmp_path / "backup"
     보관.mkdir()
     monkeypatch.setenv("CORPUS_BACKUP_DIR", str(보관))
     return lambda **kw: 백업픽스처.세대만들기("congress", db_path, 보관, **kw)
@@ -139,7 +139,7 @@ class Test문이곁기록만믿지않는다:
 
     def test_다른_DB_의_백업으로는_열리지_않는다(self, conn, 백업마당, tmp_path, monkeypatch):
         """A 를 백업한 뒤 B 를 이행하면, 실패해도 A 를 복원해 B 를 되돌릴 수 없다."""
-        보관 = tmp_path / "백업"
+        보관 = tmp_path / "backup"
         남의것 = tmp_path / "남의.db"
         다른conn = dbmod.connect(남의것)
         dbmod.init_schema(다른conn)

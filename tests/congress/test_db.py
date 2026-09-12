@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import db
+from congress import db
 
 class Test연결:
     def test_새_연결마다_외래키가_켜진다(self, db_path):

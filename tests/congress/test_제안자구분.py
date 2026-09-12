@@ -10,8 +10,8 @@ import sqlite3
 
 import pytest
 
-import bills
-import db
+from congress import bills
+from congress import db
 
 
 class Test정규화:
@@ -75,7 +75,7 @@ class Test막힘으로_남긴다:
     """
 
     def test_CHECK_밖_값을_원장에_남긴다(self, conn, monkeypatch):
-        import net
+        from congress import net
 
         행 = {"BILL_NO": "2200001", "BILL_ID": "PRC_1", "BILL_NAME": "x",
               "PROPOSER_KIND": "새라벨", "PROPOSE_DT": "2024-06-01"}

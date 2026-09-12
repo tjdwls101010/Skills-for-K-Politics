@@ -7,7 +7,7 @@
 
 import pytest
 
-import db
+from congress import db
 
 
 # ⚠️ **앵커는 테이블 이름이다.** 특정 주석 문구를 박으면 그 주석을 손댄 날

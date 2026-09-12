@@ -1,4 +1,4 @@
-"""`법령.py` — 번호 정규화와 전문 조립.
+"""`statute.py` — 번호 정규화와 전문 조립.
 
 **전문 조립이 이 스킬 전체에서 가장 비싼 실수 자리다.** 틀려도 에러가 안 나고, 검색이
 본문의 93%를 못 보게 되며, 그걸 알아채는 유일한 방법은 "왜 이 조문이 안 잡히지" 하고
@@ -7,9 +7,9 @@
 
 import pytest
 
-from 법제처.수집기 import 법령
-from 법제처 import 저장
-from 법제처 import 정규화
+from law.collectors import statute as 법령
+from law import store as 저장
+from law import normalize as 정규화
 
 
 

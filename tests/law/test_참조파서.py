@@ -1,4 +1,4 @@
-"""`참조파서.py` — `08-참조-파서-명세.md` §8 의 경계 사례 전부.
+"""`refparser.py` — `08-참조-파서-명세.md` §8 의 경계 사례 전부.
 
 **여기 있는 입력은 전부 실제 응답에서 뽑은 것이다.** 지어낸 것이 없다.
 
@@ -8,7 +8,7 @@
 
 import pytest
 
-from 법제처 import 참조파서
+from law import refparser as 참조파서
 
 
 def 주소(행):

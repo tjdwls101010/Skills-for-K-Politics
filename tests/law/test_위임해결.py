@@ -15,19 +15,19 @@ from pathlib import Path
 
 import pytest
 
-from 법제처 import 감사
-from 법제처.수집기 import 실행
-from 법제처 import 스키마
-from 법제처 import 연결
-from 법제처 import 원천
-from 법제처.수집기 import 위임
-from 법제처 import 이행
+from law import audit as 감사
+from law.collectors import run as 실행
+from law import schema as 스키마
+from law import conn as 연결
+from law import source as 원천
+from law.collectors import delegation as 위임
+from law import migrate as 이행
 
 
 
 
 
-SCRIPTS = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts" / "법제처"
+SCRIPTS = Path(__file__).resolve().parents[2] / ".claude" / "skills" / "k-politics" / "Scripts" / "law"
 
 
 def 법령(conn, mst, 법령ID, 이름):
@@ -203,7 +203,7 @@ class Test락:
         conn.close()
         with 연결.락(db_path) as lk:
             assert lk.잡음
-            r = subprocess.run([sys.executable, str(SCRIPTS / "적재.py"), 명령, "--db", str(db_path)],
+            r = subprocess.run([sys.executable, str(SCRIPTS / "load.py"), 명령, "--db", str(db_path)],
                                capture_output=True, text=True, timeout=120)
         assert r.returncode == 3, r.stderr[-300:]
 
