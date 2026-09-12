@@ -167,3 +167,38 @@ class Test스키마명령:
             db._main(["schema", "--help"])
         out = capsys.readouterr().out
         assert "목록" in out and "정의" in out
+
+
+class TestSCHEMA_독자:
+    """SCHEMA 를 읽는 사람은 의원실 일을 하는 클로드다 — `audit.py` 를 돌리는 관리자가 아니다.
+
+    한때 그 구분을 스냅샷 빌더가 주석을 갈아 끼워 냈는데, 원천과 패치 두 곳을 고쳐야 해서
+    첫날부터 드리프트가 났다. 이제 원천이 곧 독자용이다 — 관리자 좌표는 여기 없다.
+    """
+
+    @pytest.mark.parametrize("좌표", [r"audit [AR]\d+", r"감사 [AR]\d+", "정리 유예"])
+    def test_관리자_좌표를_가리키지_않는다(self, 좌표):
+        """게이트 번호는 그 번호를 아는 사람에게만 뜻이 있다. 원리로 바꾼다 — 「어떤 값이
+        오는지는 SELECT DISTINCT 로 본다」는 게이트를 몰라도 맞고, 안 적힌 경우에도 맞는다."""
+        남음 = [줄 for 줄 in db.SCHEMA.splitlines() if re.search(좌표, 줄)]
+        assert 남음 == [], "\n".join(남음)
+
+    def test_열린_값_집합은_확인하는_법으로_말한다(self):
+        assert "SELECT DISTINCT 처리결과" in db.SCHEMA
+
+    def test_공포번호가_일괄개정_함정을_들고_있다(self):
+        """`법령.공포번호` 와 같은 번호라 '이 법안이 고친 법'의 키로 쓰고 싶어진다 —
+        일괄개정 하나가 여러 법에 같은 번호를 남기므로 그 키가 아니다."""
+        의안 = next(m.group(0) for m in db._테이블문.finditer(db.SCHEMA) if m.group(1) == "의안")
+        공포번호 = next(줄 for 줄 in 의안.splitlines() if 줄.strip().startswith("공포번호"))
+        자리 = 의안.splitlines().index(공포번호)
+        주변 = "\n".join(의안.splitlines()[자리:자리 + 3])
+        assert "일괄개정" in 주변
+
+    def test_이어지는_줄이_없다(self):
+        """`--   ` 처럼 들여쓴 이어짐 줄은 앞 줄의 주장이 잘린 것이다 — 모델은 `head`·`grep`
+        으로 줄 단위로 읽으므로 경고가 반 토막으로 온다. law 쪽 `test_주석형식.py` 와 같은 규칙인데
+        국회에는 그것을 잠그는 테스트가 없었다(실측 2026-09-12: 이미 0건)."""
+        주석 = [줄 for 줄 in db.SCHEMA.splitlines() if 줄.lstrip().startswith("--")]
+        이어짐 = [줄 for 줄 in 주석 if re.match(r"^\s*--\s{3,}\S", 줄)]
+        assert 이어짐 == [], "\n".join(이어짐)
