@@ -8,7 +8,7 @@ allowed-tools: Bash(sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&im
 우리 의원실은 **김형연**(조국혁신당·비례대표, **정무위원회**, 2026-08-31 취임, 의원코드 `KBZ59750`)이다. "우리 소관인가"의 기준은 정무위원회이고, 취임일 이전의 발의·표결·발언은 전임자의 것이다.
 
 코퍼스 기준일:
-!`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" "SELECT 코퍼스, 적재기준시각, 감사통과, 경고 FROM 신선도" 2>&1 || echo "(법.db 를 못 읽었다 — 스냅샷이 없거나 빌드가 실패했다. 국회·법령 질의는 답하기 전에 이 사실을 밝힌다.)"`
+!`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" "SELECT 코퍼스, 적재기준시각, 감사통과, 감사시각, 경고 FROM 신선도" 2>&1 || echo "(법.db 를 못 읽었다 — 스냅샷이 없거나 빌드가 실패했다. 국회·법령 질의는 답하기 전에 이 사실을 밝힌다.)"`
 !`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/뉴스.db?mode=rw" "PRAGMA query_only=1; SELECT '뉴스 최신 발행 ' || MAX(date_published) FROM articles" 2>&1 || echo "(뉴스.db 를 못 읽었다 — 보도 질의는 ultra-search 로 간다.)"`
 
 법.db 가 가진 것(뷰 먼저, 그다음 표):
