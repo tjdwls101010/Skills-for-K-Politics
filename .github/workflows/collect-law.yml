@@ -97,20 +97,6 @@ jobs:
             2>&1 | tee collect.txt
           echo "code=$?" >> "$GITHUB_OUTPUT"
 
-      - name: 스냅샷 재빌드
-        id: snapshot
-        # 원천이 바뀌었으니 조회용 스냅샷도 새로 만든다. 수집이 실패해 이 스텝을 건너뛰어도
-        # 직전 스냅샷이 그대로 남는다 — 빌더가 검증을 통과한 뒤에만 파일을 교체한다.
-        if: steps.collect.outputs.code == '0' || steps.collect.outputs.code == '1'
-        run: |
-          set +e
-          set -o pipefail
-          caffeinate -ims uv run .claude/skills/k-politics/Scripts/snapshot.py \
-            --원천국회 "$CONGRESS_DB" --원천법령 "$LAW_DB" \
-            --소관기관 .claude/skills/k-politics/DBs/소관기관.db \
-            --출력 .claude/skills/k-politics/DBs/법.db 2>&1 | tee snapshot.txt
-          echo "code=$?" >> "$GITHUB_OUTPUT"
-
       - name: 요약
         if: always()
         # ⚠️ **`uv run` 으로 부르지 마라.** 이 레포의 워크플로에서 `uv run` 줄은 전부
@@ -139,7 +125,6 @@ jobs:
             collect.txt
             verify.txt
             result.json
-            snapshot.txt
           retention-days: 30
 
       - name: 판정 전파
@@ -152,19 +137,10 @@ jobs:
           p=${{ steps.preflight.outcome }}
           v=${{ steps.verify.outputs.code }}
           c=${{ steps.collect.outputs.code || 1 }}
-          s=${{ steps.snapshot.outputs.code || 1 }}
           [ "$p" != "success" ] && { echo "::error::DB 경로 점검 실패 — 수집을 시작하지 않았다"; exit 1; }
           [ "$v" != "0" ] && { echo "::error::검증 실패($v) — 수집을 건너뛰었다"; exit 1; }
           # ⚠️ **3(락을 못 잡아 물러남)은 고장이 아니다 — 빨갛게 만들면 늑대를 부른다.**
           #    다만 **0 과 같은 얼굴이어서도 안 된다**: 그날 원천에서 받은 것이 없다.
           #    `collect-congress.yml` 과 같은 규칙이다.
           [ "$c" = "3" ] && { echo "::warning::이미 도는 실행이 있어 물러났다 — 오늘 받은 것이 없다"; exit 0; }
-          # 스냅샷 실패는 낡은 조회 결과를 숨기므로 전파한다. 락 물러남만 경고이며 수집 실패를 덮지 않는다.
-          if [ "$c" = "0" ] || [ "$c" = "1" ]; then
-            case "$s" in
-              0) ;;
-              3) echo "::warning::스냅샷 락을 못 잡아 물러났다 — 직전 스냅샷을 유지한다" ;;
-              *) echo "::error::스냅샷 재빌드 실패($s) — 조회용 스냅샷이 갱신되지 않았다"; exit 1 ;;
-            esac
-          fi
           exit "$c"
