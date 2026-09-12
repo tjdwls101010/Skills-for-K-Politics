@@ -12,10 +12,6 @@ allowed-tools: Bash(sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/*), Bash(sqlite3 
 !`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw" "PRAGMA query_only=1; SELECT '법령' AS 코퍼스, * FROM 신선도" 2>&1 || echo "(LAW.db 를 못 읽었다 — 법령·판례 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
 !`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/NEWS.db?mode=rw" "PRAGMA query_only=1; SELECT '뉴스 최신 발행 ' || MAX(date_published) FROM articles" 2>&1 || echo "(NEWS.db 를 못 읽었다 — 보도 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
 
-두 코퍼스가 가진 것(뷰 먼저, 그다음 표):
-!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/CONGRESS.db?mode=rw" "PRAGMA query_only=1; SELECT 'CONGRESS.db · ' || group_concat(name, ' · ') FROM (SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, rowid)" 2>&1 || echo "(CONGRESS.db 의 목록을 못 읽었다 — 국회 기록 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
-!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw" "PRAGMA query_only=1; SELECT 'LAW.db · ' || group_concat(name, ' · ') FROM (SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, rowid)" 2>&1 || echo "(LAW.db 의 목록을 못 읽었다 — 법령·판례 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
-
 ## 무엇을 대행하고 무엇을 대행하지 않나
 
 사실·제도·법적 제약·효과·전례는 **능동적으로 조사한다.** 사용자가 묻지 않아도 판단에 필요하면 찾아서 댄다. 대행하지 않는 것은 하나뿐이다 — **무엇을 감수하고 무엇을 지킬지의 가치 판단.** 그건 사용자가 유권자와 의원 앞에서 지는 몫이라, 클로드가 대신 지면 사용자는 자기가 뭘 골랐는지 모르는 채 결과만 받는다. **가치의 유보는 지능의 유보가 아니다** — "그것도 하나의 관점입니다"는 유보가 아니라 직무유기다.
@@ -67,7 +63,7 @@ sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/<NEWS|CONGRESS|LAW|AGENCIES>.db?mode=
 
 **한 파일의 뷰는 다른 파일을 못 본다.** 두 코퍼스를 한 질의로 보려면 같은 명령 안에서 `ATTACH 'file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw' AS 법령;`을 앞에 두고 `법령.<표>`로 부른다. 안 하면 "이 법안이 고치려는 법의 지금 조문"은 두 질의다.
 
-**위 목록이 무엇이 있는지를, `.schema <이름>`이 그것을 어떻게 쓰는지를 말한다.** 이름만으로 짐작하지 말고 처음 쓰는 표·뷰는 주석을 먼저 읽는다 — 함정이 거기 다 있고, 그걸 모르고 쓴 SQL은 **에러 없이 그럴듯한 빈 결과나 부풀린 수를 준다.** 이름은 조인 키가 아니고(동명이인), 발언은 안건과 연결되지 않고, 공포일은 시행일이 아니고, 한 법령ID에 현행 판본이 여럿일 수 있다.
+**무엇이 있는지를 목록에 묻고, 그것을 어떻게 쓰는지를 `.schema <이름>`에 묻는다.** 국회는 `Scripts/congress/db.py schema`가 목록에 행수·역할·컬럼 이름까지 붙여 주고, 나머지 파일은 `sqlite_master`를 읽는다. 이름만으로 짐작하지 말고 처음 쓰는 표·뷰는 주석을 먼저 읽는다 — 함정이 거기 다 있고, 그걸 모르고 쓴 SQL은 **에러 없이 그럴듯한 빈 결과나 부풀린 수를 준다.** 이름은 조인 키가 아니고(동명이인), 발언은 안건과 연결되지 않고, 공포일은 시행일이 아니고, 한 법령ID에 현행 판본이 여럿일 수 있다.
 
 **질문의 종류가 목록에 있는지부터 본다.** "누가 이 자료를 쥐었나"·"지금 시행 중인 조문이 무엇인가"·"이 의원이 뭘 했나"처럼 자주 필요한 것은 이미 표나 뷰로 서 있다. 조인을 손으로 조립하기 전에 목록을 훑는 것이 대개 빠르고, 손으로 조립한 조인이 뷰가 이미 피해 둔 함정을 다시 밟는다.
 
