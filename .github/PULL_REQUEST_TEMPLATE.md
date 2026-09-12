@@ -15,5 +15,5 @@
 <!-- 실제로 돌린 명령과 결과 수치. 안 돌렸으면 안 돌렸다고 쓴다.
      수집 코드를 고쳤으면 최소한:
        uv run --with pytest --with selectolax pytest tests/ -q
-       uv run .claude/skills/congress/Scripts/verify.py
-       uv run .claude/skills/congress/Scripts/audit.py -->
+       uv run .claude/skills/k-politics/Scripts/congress/verify.py
+       uv run .claude/skills/k-politics/Scripts/congress/audit.py -->

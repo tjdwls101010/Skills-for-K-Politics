@@ -1,0 +1,31 @@
+name: 하네스 점검
+
+on:
+  pull_request:
+
+# 기본 권한을 최소로 내린다. 이 잡은 레포를 읽기만 하고 아무것도 쓰지 않는다 —
+# 명시하지 않으면 레포/조직 기본값이 적용되고, 그 기본값은 여기가 아니라 설정 화면에서
+# 바뀐다. 필요한 권한은 잡이 각자 올려 잡는다(`watchdog.yml` 이 그 예다).
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    # ⚠️ **여기만 self-hosted 가 아니다.** PR 검사가 성진의 맥에 묶이면 맥이 꺼진 날
+    #    PR 이 영영 안 돈다. 네트워크를 안 타는 테스트라 ubuntu 로 충분하고,
+    #    그래서 이 잡의 `uv run` 에는 `caffeinate` 가 없다(잠들 맥이 없다).
+    runs-on: ubuntu-latest
+    steps:
+      # ⚠️ **commit SHA 로 고정한다.** `@v4` 는 이동 가능한 태그라 같은 이름이 다른
+      #    코드를 가리키게 바뀔 수 있다. 올릴 때는 SHA 를 손으로 바꾼다.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e  # v6
+      - name: 네트워크 없는 회귀 테스트 전량
+        # ⚠️ **경로를 좁혀 부르지 마라.** 예전 레포에서 CI 가 한 코퍼스만 돌린 적이 있는데,
+        #    그동안 다른 코퍼스의 경로가 어긋나 `pytest tests/` 가 통째로 중단되는 상태를
+        #    아무도 몰랐다 — 안전망이 꺼진 것을 안전망이 알려 주지 못했다.
+        #    `pyproject.toml` 의 `testpaths` 가 범위를 지고, 이 줄은 그것을 통째로 부른다.
+        # ⚠️ 의존성도 좁히지 마라. `selectolax` 가 없으면 congress 테스트가 import 단계에서
+        #    죽고, `httpx[http2]` 가 없으면 law 의 http2 테스트가 죽는다. `--group test` 가
+        #    그 목록의 유일한 원천이다.
+        run: uv run --group test pytest -q
