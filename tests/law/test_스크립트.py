@@ -21,9 +21,6 @@ def test_스크립트를_하나도_빠뜨리지_않았다():
     """새 스크립트가 생기면 이 목록이 자동으로 늘어난다 — 손으로 적지 않는다."""
     assert set(파일들) == {
         "audit.py", "verify.py", "collect.py", "load.py", "direct.py",
-        # ⚠️ **일회성이다.** 컷오버가 끝나면 `convert_v3.py` 와 이 줄을 함께 지운다 —
-        #    남겨 두면 다음 사람이 "이 DB 는 옛 모양일 수도 있다"로 읽는다.
-        "convert_v3.py",
     }
 
 
