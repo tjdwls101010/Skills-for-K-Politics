@@ -12,7 +12,8 @@ def 신선도(conn):
 
 
 def test_메타가_비어_있으면_한_행이고_값은_전부_NULL(conn):
-    assert tuple(신선도(conn)) == (None, None, None, None, None)
+    행 = 신선도(conn)
+    assert tuple(행) == (None, None, None, None, None)
 
 
 def _메타(conn, **키값):
