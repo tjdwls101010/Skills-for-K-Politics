@@ -19,7 +19,7 @@ class Test스키마:
         n = conn.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
         ).fetchone()[0]
-        assert n == 18  # 위임 추가 · 행정규칙별표 삭제(D42) · 정리후보 추가
+        assert n == 10  # 데이터 8 + 운영 2
 
     def test_모든_CREATE_TABLE_을_정규식이_잡는다(self):
         """⚠️ **`_테이블문` 이 못 잡은 테이블은 `migrate()` 도 `_테이블재구축` 도 못 본다.**
@@ -41,118 +41,108 @@ class TestCHECK:
     """**`CHECK` 은 낡을 수 없는 주석이다 — 낡으면 `INSERT` 가 실패한다.**
 
     이 DB 에서 오늘까지 값 집합은 주석에만 있었고, 실측으로 낡은 주석을 여섯 곳 찾았다.
-    우리 설계가 집합을 닫은 넷에만 건다(D41) — 원천이 값을 늘릴 수 있는 `출처필드`·
-    `수집상태.단계`·`실패종류`·`파싱실패.사유` 에는 안 건다. 그건 레일이 된다.
+    **우리 설계가 집합을 닫은 자리에만 건다** — 원천이 값을 늘릴 수 있는 `법종구분`·
+    `제개정구분`·`사건종류` 에는 안 건다. 그건 레일이 된다.
     """
 
     @pytest.mark.parametrize(
         "무엇, sql",
         [("의율조문.자료종류",
-          "INSERT INTO 의율조문 (자료종류, 자료ID, 출처필드, 법령명원문, 원문조각)"
+          "INSERT INTO 의율조문 (자료종류, 자료ID, 출처, 법령명원문, 원문조각)"
           " VALUES ('위원회결정', '1', '참조조문', '개인정보 보호법', 'x')"),
+         ("의율조문.출처",
+          "INSERT INTO 의율조문 (자료종류, 자료ID, 출처, 법령명원문, 원문조각)"
+          " VALUES ('판례', '1', '이유', '개인정보 보호법', 'x')"),
+         ("의율조문.부칙여부",
+          "INSERT INTO 의율조문 (자료종류, 자료ID, 출처, 법령명원문, 부칙여부, 원문조각)"
+          " VALUES ('판례', '1', '참조조문', '개인정보 보호법', 2, 'x')"),
          # 인용판례는 둘뿐이다 — 판례·헌재만 참조판례를 준다
          ("인용판례.자료종류",
           "INSERT INTO 인용판례 (자료종류, 자료ID, 피인용사건번호, 원문조각)"
-          " VALUES ('행정심판례', '1', '2018다244488', 'x')"),
-         ("법령.현행연혁코드",
-          "INSERT INTO 법령 (법령일련번호, 법령ID, 법령명, 법종구분, 현행연혁코드, 수집일시)"
-          " VALUES ('270351', '011357', '개인정보 보호법', '법률', '연혁', 'x')"),
-         ("조문.조문여부",
-          "INSERT INTO 조문 (법령일련번호, 조문키, 조문번호, 조문내용, 전문, 조문여부, 순서)"
-          " VALUES ('270351', '0015001', 15, 'x', 'x', '본문', 0)")],
+          " VALUES ('법령해석례', '1', '2018다244488', 'x')"),
+         ("인용판례.피인용종류",
+          "INSERT INTO 인용판례 (자료종류, 자료ID, 피인용종류, 피인용사건번호, 원문조각)"
+          " VALUES ('판례', '1', '행정심판례', '2018다244488', 'x')"),
+         ("위임.위임구분",
+          "INSERT INTO 위임 (법령ID, 순서, 조, 위임구분, 대상제목)"
+          " VALUES ('011357', 0, 8, '인용법령', 'x')"),
+         ("판례.형식",
+          "INSERT INTO 판례 (판례ID, 사건번호, 형식, 수집일시)"
+          " VALUES ('1', '2024다1', '재판', 'x')"),
+         ("판례.전원합의체",
+          "INSERT INTO 판례 (판례ID, 사건번호, 전원합의체, 수집일시)"
+          " VALUES ('1', '2024다1', 9, 'x')"),
+         # 전문·판시사항·결정요지가 다 없는 껍데기는 담지 않는다
+         ("헌재결정례.본문셋",
+          "INSERT INTO 헌재결정례 (헌재결정례ID, 사건번호, 전문, 수집일시)"
+          " VALUES ('1', '2015헌마1', '', 'x')"),
+         # 시행예정 두 컬럼은 함께 있거나 함께 없다
+         ("법령.시행예정쌍",
+          "INSERT INTO 법령 (법령ID, 법령일련번호, 법령명, 법종구분, 시행예정일련번호, 수집일시)"
+          " VALUES ('X', '9', 'x', '법률', '283839', 'x')"),
+         ("수집상태.단계",
+          "INSERT INTO 수집상태 (자료종류, 단계, 상태, 갱신일시, 상태시작일시)"
+          " VALUES ('판례', '본문', '완료', 'x', 'x')"),
+         ("수집상태.상태",
+          "INSERT INTO 수집상태 (자료종류, 단계, 상태, 갱신일시, 상태시작일시)"
+          " VALUES ('판례', '목록', '부분수신', 'x', 'x')"),
+         ("수집실패.실패종류",
+          "INSERT INTO 수집실패 (자료종류, 자료ID, 실패종류, 최초일시, 최종일시)"
+          " VALUES ('판례', '1', '네트워크', 'x', 'x')")],
     )
     def test_닫아_둔_값집합_밖은_INSERT_가_막는다(self, conn, 무엇, sql):
-        if 무엇 == "조문.조문여부":  # FK 가 먼저 걸리지 않게 부모를 둔다
+        if 무엇 == "위임.위임구분":  # FK 가 먼저 걸리지 않게 부모를 둔다
             저장.저장(conn, "법령", _법령())
         with pytest.raises(sqlite3.IntegrityError, match="CHECK"):
             conn.execute(sql)
 
+    @pytest.mark.parametrize("표, 컬럼", [
+        ("법령", "법령ID"), ("판례", "판례ID"),
+        ("헌재결정례", "헌재결정례ID"), ("법령해석례", "법령해석례ID"),
+    ])
+    def test_원천_손잡이는_NULL_이_될_수_없다(self, conn, 표, 컬럼):
+        """⚠️ **SQLite 의 TEXT PRIMARY KEY 는 NULL 을 허용한다.** NOT NULL 을 안 붙이면
+        키 없는 행이 들어가고, 그 행은 어느 조인에도 안 걸리면서 건수에는 잡힌다."""
+        본문 = ", 전문" if 표 == "헌재결정례" else ""
+        값 = ", '전문'" if 표 == "헌재결정례" else ""
+        나머지 = {"법령": ", 법령일련번호, 법령명, 법종구분", "판례": ", 사건번호",
+                "헌재결정례": ", 사건번호", "법령해석례": ", 안건번호, 안건명"}[표]
+        더 = {"법령": ", '9', 'x', '법률'", "판례": ", '2024다1'",
+             "헌재결정례": ", '2015헌마1'", "법령해석례": ", '20-0370', 'x'"}[표]
+        with pytest.raises(sqlite3.IntegrityError, match="NOT NULL"):
+            conn.execute(
+                f"INSERT INTO {표} ({컬럼}{나머지}{본문}, 수집일시)"
+                f" VALUES (NULL{더}{값}, 'x')")
+
     def test_옳은_값은_그대로_들어간다(self, conn):
         """⚠️ 막는 것만 시험하면 **전부 막는 CHECK** 도 통과한다."""
         저장.저장(conn, "법령", _법령())
-        저장.저장(conn, "법령", _법령("999999", 연혁="시행예정"))
-        for 종류 in ("판례", "헌재결정례", "행정심판례", "법령해석례"):
-            conn.execute(
-                "INSERT INTO 의율조문 (자료종류, 자료ID, 출처필드, 법령명원문, 원문조각)"
-                " VALUES (?, '1', '참조조문', '개인정보 보호법', 'x')", (종류,)
-            )
-        assert conn.execute("SELECT COUNT(*) FROM 의율조문").fetchone()[0] == 4
+        for 종류 in ("판례", "헌재결정례", "법령해석례"):
+            for 출처 in ("참조조문", "심판대상조문", "안건명"):
+                conn.execute(
+                    "INSERT INTO 의율조문 (자료종류, 자료ID, 출처, 법령명원문, 원문조각)"
+                    " VALUES (?, '1', ?, '개인정보 보호법', 'x')", (종류, 출처))
+        assert conn.execute("SELECT COUNT(*) FROM 의율조문").fetchone()[0] == 9
 
 
 class Test뷰:
-    """**뷰는 산문이 지키던 함정을 인터페이스로 옮긴 것이다**(D40).
+    """**뷰는 산문이 지키던 고정 조인을 인터페이스로 옮긴 것이다.**
 
-    `.schema` 안에 살아 매 세션 공짜로 다시 읽히고, 함정표 한 줄은 읽고 기억해야 한다.
-    이름이 `현행-` 으로 시작하는 것이 요점이다 — `조문` 을 직접 쓰면 시행예정과 장 제목이
-    섞인다는 사실이 **이름에 적혀 있게** 된다.
+    `.schema` 안에 살아 매 세션 공짜로 다시 읽히고, 지면의 SQL 한 덩어리는 읽고 옮겨
+    적어야 한다. 내용은 `test_새뷰.py` 가 보고, 여기서는 **정의가 갱신되는가**만 본다.
     """
-
-    @pytest.fixture
-    def 섞인DB(self, conn):
-        """현행 1 + 시행예정 1, 각각 조문 1행 + 편·장 제목 1행. **실물의 축소판이다.**
-
-        실측: `조문.전문 LIKE '%광고성 정보%'` 를 필터 없이 세면 55, 두 조건을 걸면 24 다.
-        """
-        저장.저장(conn, "법령", _법령("270351", 연혁="현행"),
-                {"조문": [_조문("0015001", 15, "제15조 현행 …", 1),
-                          {**_조문("0015000", 15, "제3장 개인정보의 처리", 0),
-                           "조문여부": "전문"}]})
-        저장.저장(conn, "법령", _법령("283839", 연혁="시행예정"),
-                {"조문": [_조문("0015001", 15, "제15조 시행예정 …", 1)]})
-        return conn
-
-    def test_현행법령_이_시행예정을_뺀다(self, 섞인DB):
-        assert [r[0] for r in 섞인DB.execute("SELECT 법령일련번호 FROM 현행법령")] == ["270351"]
-
-    def test_현행조문_이_시행예정과_장제목을_한꺼번에_뺀다(self, 섞인DB):
-        """⚠️ **함정 둘을 뷰 하나가 없앤다.** `법령ID` 만 걸면 시행예정 조문이 섞이고,
-        `조문번호=15` 만 걸면 편·장 제목 행이 함께 나온다 — 그 행도 조문번호를 갖고
-        실제 조와 겹치기 때문이다. 둘 다 에러 없이 그럴듯한 답을 낸다."""
-        섞인 = 섞인DB.execute(
-            "SELECT COUNT(*) FROM 조문 j JOIN 법령 l USING (법령일련번호)"
-            " WHERE l.법령ID='011357' AND j.조문번호=15").fetchone()[0]
-        뷰 = 섞인DB.execute(
-            "SELECT 전문 FROM 현행조문 WHERE 법령ID='011357' AND 조문번호=15").fetchall()
-        assert 섞인 == 3
-        assert [r[0] for r in 뷰] == ["제15조 현행 …"]
-
-    def test_현행조문_이_목차_조회에_그대로_쓰인다(self, 섞인DB):
-        """3단계 ②(목차)와 전문 가로지르기가 뷰 하나로 끝나야 한다 — 두 질의가 서로 다른
-        테이블을 보면 ②를 건너뛰는 쪽으로 손이 간다."""
-        목차 = 섞인DB.execute(
-            "SELECT 조문번호, 조문가지번호, 조문제목 FROM 현행조문"
-            " WHERE 법령ID='011357' ORDER BY 순서").fetchall()
-        assert len(목차) == 1
-
-    def test_두_시행일자가_이름으로_갈린다(self, 섞인DB):
-        """⚠️ `법령.시행일자` 와 `조문.조문시행일자` 는 **다를 수 있다** — 개정법이 일부
-        조문만 유예하는 것은 통상이다. 뷰가 둘을 같은 이름으로 내놓으면 그 구분이 사라진다."""
-        컬럼 = [r[1] for r in 섞인DB.execute("PRAGMA table_info(현행조문)")]
-        assert "법령시행일자" in 컬럼 and "조문시행일자" in 컬럼
-        assert len(컬럼) == len(set(컬럼))
-
-    def test_조문내용은_뷰에_없다(self, 섞인DB):
-        """**틀린 손을 막는 가장 싼 방법은 그 컬럼을 안 내놓는 것이다.**
-
-        항이 있는 조에서 `조문내용` 은 제목 한 줄뿐이라 검색에 쓰면 본문의 93%가 조용히
-        사라진다. 지금까지 그건 문서의 함정표 한 줄이 지키고 있었는데, 함정표는 읽고
-        기억해야 하고 뷰의 컬럼 목록은 `.schema` 에 적혀 있다.
-        """
-        컬럼 = [r[1] for r in 섞인DB.execute("PRAGMA table_info(현행조문)")]
-        assert "조문내용" not in 컬럼
-        assert "전문" in 컬럼
 
     def test_뷰_정의를_고치면_기존_DB_에도_반영된다(self, conn):
         """⚠️ **`CREATE VIEW IF NOT EXISTS` 는 정의가 바뀌어도 갱신하지 않는다.**
         그대로 두면 뷰가 이 DB 안에서 낡고, `.schema` 를 읽는 클로드는 낡은 정의를
         정본으로 읽는다 — 테이블 주석에 `migrate()` 가 필요한 것과 같은 이유다."""
-        conn.execute("DROP VIEW 현행법령")
-        conn.execute("CREATE VIEW 현행법령 AS SELECT * FROM 법령")  # 낡은 정의
+        conn.execute("DROP VIEW 조문판단수")
+        conn.execute("CREATE VIEW 조문판단수 AS SELECT 법령ID FROM 조문")  # 낡은 정의
         이행.init_schema(conn)
         저장된 = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type='view' AND name='현행법령'"
+            "SELECT sql FROM sqlite_master WHERE type='view' AND name='조문판단수'"
         ).fetchone()[0]
-        assert "현행연혁코드='현행'" in 저장된
+        assert "판례수" in 저장된
 
 
 class Test연결:
@@ -170,8 +160,8 @@ class Test연결:
     def test_FK_가_실제로_막는다(self, conn):
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
-                "INSERT INTO 조문 (법령일련번호, 조문키, 조문번호, 조문내용, 전문, 조문여부, 순서)"
-                " VALUES ('없는법령', '0001001', 1, 'x', 'x', '조문', 0)"
+                "INSERT INTO 조문 (법령ID, 순서, 조, 가지, 전문)"
+                " VALUES ('없는법령', 0, 1, 0, 'x')"
             )
 
     def test_db_경로는_환경변수가_기본값을_이긴다(self, tmp_path, monkeypatch):
@@ -186,70 +176,39 @@ class Test연결:
         assert 연결.db_path().parent.name == "DBs"
 
 
-def _법령(일련="270351", 명="개인정보 보호법", 연혁="현행"):
+def _법령(법령ID="011357", mst="270351", 명="개인정보 보호법"):
     return {
-        "법령일련번호": 일련,
-        "법령ID": "011357",
+        "법령ID": 법령ID,
+        "법령일련번호": mst,
         "법령명": 명,
         "법종구분": "법률",
-        "현행연혁코드": 연혁,
     }
 
 
-def _조문(키="0015001", 번호=15, 전문="제15조 …", 순서=0):
-    return {
-        "조문키": 키,
-        "순서": 순서,
-        "조문번호": 번호,
-        "조문가지번호": 0,
-        "조문내용": "제15조(개인정보의 수집ㆍ이용)",
-        "전문": 전문,
-        "조문여부": "조문",
-    }
+def _조문(순서=0, 조=15, 전문="제15조 …"):
+    return {"순서": 순서, "조": 조, "가지": 0, "전문": 전문}
 
 
 class Test저장:
     def test_본문과_자식이_함께_들어간다(self, conn):
-        저장.저장(
-            conn,
-            "법령",
-            _법령(),
-            {
-                "조문": [_조문()],
-                "조문요소": [
-                    {"조문순서": 0, "항번호": 1, "깊이": 1, "내용": "① …", "순서": 0}
-                ],
-                "부칙": [{"순서": 0, "내용": "부칙 …"}],
-            },
-        )
+        저장.저장(conn, "법령", _법령(), {"조문": [_조문()]})
         assert conn.execute("SELECT COUNT(*) FROM 법령").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM 조문").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM 조문요소").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM 부칙").fetchone()[0] == 1
 
     def test_수집일시가_자동으로_채워진다(self, conn):
         저장.저장(conn, "법령", _법령())
         assert conn.execute("SELECT 수집일시 FROM 법령").fetchone()[0]
 
-    def test_다시_저장하면_옛_자식이_남지_않는다(self, conn):
-        """⚠️ 개정으로 조문이 통째로 갈릴 수 있다. 부분 갱신은 옛 조문을 남기고,
-        그러면 없는 조문이 검색에 계속 걸린다."""
-        저장.저장(conn, "법령", _법령(), {"조문": [_조문("0015001", 15), _조문("0016001", 16, 순서=1)]})
-        저장.저장(conn, "법령", _법령(), {"조문": [_조문("0015001", 15, "개정된 제15조")]})
-        행 = conn.execute("SELECT 조문키, 전문 FROM 조문").fetchall()
-        assert [r[0] for r in 행] == ["0015001"]
-        assert 행[0][1] == "개정된 제15조"
-
-    def test_같은_법령ID_의_다른_버전은_공존한다(self, conn):
-        # 현행 1 + 시행예정 N. 조문 조회에서 현행연혁코드를 안 걸면 섞여 나온다(07 §1).
-        저장.저장(conn, "법령", _법령("270351", 연혁="현행"))
-        저장.저장(conn, "법령", _법령("999999", 연혁="시행예정"))
-        assert conn.execute(
-            "SELECT COUNT(*) FROM 법령 WHERE 법령ID='011357'"
-        ).fetchone()[0] == 2
+    def test_같은_법령ID_는_한_행뿐이다(self, conn):
+        """⚠️ **판본이 아니라 법이 행이다.** 두 행이 되면 판본을 안 보고 조문을 세는
+        질의가 같은 조를 판본 수만큼 곱해 돌려준다 — 에러 없이."""
+        저장.저장(conn, "법령", _법령(mst="270351"))
+        저장.저장(conn, "법령", _법령(mst="283839"))
+        r = conn.execute("SELECT COUNT(*), MAX(법령일련번호) FROM 법령").fetchone()
+        assert tuple(r) == (1, "283839")
 
     def test_저장하면_수집실패에서_지워진다(self, conn):
-        저장.record_failure(conn, "법령", "270351", "네트워크", "타임아웃")
+        저장.record_failure(conn, "법령", "011357", "재시도", "타임아웃")
         assert conn.execute("SELECT COUNT(*) FROM 수집실패").fetchone()[0] == 1
         저장.저장(conn, "법령", _법령())
         assert conn.execute("SELECT COUNT(*) FROM 수집실패").fetchone()[0] == 0
@@ -269,24 +228,90 @@ class Test저장:
             저장.컬럼들(conn, "없는테이블")
 
     def test_기본키가_비면_터진다(self, conn):
-        with pytest.raises(ValueError, match="법령일련번호"):
-            저장.저장(conn, "법령", {**_법령(), "법령일련번호": ""})
+        with pytest.raises(ValueError, match="법령ID"):
+            저장.저장(conn, "법령", {**_법령(), "법령ID": ""})
 
-    def test_여섯_종_전부_저장_경로가_있다(self, conn):
-        assert set(저장.본문테이블) == {
-            "법령", "판례", "헌재결정례", "행정심판례", "법령해석례", "행정규칙",
-        }
-        저장.저장(conn, "판례", {"판례일련번호": "1", "사건번호": "2026도477"})
-        저장.저장(conn, "헌재결정례", {"헌재결정례일련번호": "1", "사건번호": "2015헌마1140"})
-        저장.저장(conn, "행정심판례", {"행정심판례일련번호": "1", "사건번호": "2022 경기행심 1680"})
-        저장.저장(conn, "법령해석례", {"법령해석례일련번호": "1", "안건명": "…"})
-        저장.저장(
-            conn,
-            "행정규칙",
-            {"행정규칙일련번호": "1", "행정규칙ID": "97361", "행정규칙명": "…"},
-            {"행정규칙조문": [{"순서": 0, "내용": "제1조(목적) …"}]},
-        )
-        assert conn.execute("SELECT COUNT(*) FROM 행정규칙조문").fetchone()[0] == 1
+    def test_네_종_전부_저장_경로가_있다(self, conn):
+        assert set(저장.본문테이블) == {"법령", "판례", "헌재결정례", "법령해석례"}
+        저장.저장(conn, "판례", {"판례ID": "1", "사건번호": "2026도477"})
+        저장.저장(conn, "헌재결정례",
+                {"헌재결정례ID": "1", "사건번호": "2015헌마1140", "전문": "…"})
+        저장.저장(conn, "법령해석례",
+                {"법령해석례ID": "1", "안건번호": "20-0370", "안건명": "…"})
+        저장.저장(conn, "법령", _법령(), {"조문": [_조문()]})
+        for 테이블 in ("판례", "헌재결정례", "법령해석례", "조문"):
+            assert conn.execute(f"SELECT COUNT(*) FROM {테이블}").fetchone()[0] == 1
+
+
+class Test본문지우기:
+    """철회·정리가 본문을 지울 때 **파생 행도 함께** 지운다. 남으면 없는 판단을 가리키는
+    행이 되고, `인용판례` 는 게이트도 없어 조용하다."""
+
+    def _판단둘(self, conn):
+        저장.저장(conn, "판례", {"판례ID": "P1", "사건번호": "2024다1"})
+        저장.저장(conn, "판례", {"판례ID": "P2", "사건번호": "2024다2"})
+        저장.저장(conn, "헌재결정례",
+                {"헌재결정례ID": "P1", "사건번호": "2020헌바1", "전문": "…"})
+        conn.execute(
+            "INSERT INTO 의율조문 (자료종류, 자료ID, 출처, 법령명원문, 원문조각)"
+            " VALUES ('판례','P1','참조조문','민법','x')")
+        conn.executemany(
+            "INSERT INTO 인용판례 (자료종류, 자료ID, 피인용종류, 피인용자료ID,"
+            " 피인용사건번호, 원문조각) VALUES (?,?,?,?,?,'x')",
+            [("판례", "P1", "판례", "P2", "2024다2"),
+             ("판례", "P2", "판례", "P1", "2024다1"),
+             ("판례", "P2", "헌재결정례", "P1", "2020헌바1")])
+
+    def test_본문과_파생_행을_함께_지운다(self, conn):
+        self._판단둘(conn)
+        저장.본문지우기(conn, "판례", ["P1"])
+        assert conn.execute("SELECT COUNT(*) FROM 판례").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM 의율조문").fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM 인용판례 WHERE 자료ID='P1'").fetchone()[0] == 0
+
+    def test_남의_인용행에_박힌_링크를_끊는다(self, conn):
+        """⚠️ 파생 삭제는 인용한 쪽만 본다. 그대로 두면 `피인용자료ID` 가 **없는 자료를
+        가리키고**, NULL 이 곧 "적재 범위 밖"이라는 뜻이니 끊는 순간 그게 사실이 된다."""
+        self._판단둘(conn)
+        저장.본문지우기(conn, "판례", ["P1"])
+        assert conn.execute(
+            "SELECT 피인용자료ID FROM 인용판례 WHERE 자료ID='P2' AND 피인용종류='판례'"
+        ).fetchone()[0] is None
+
+    def test_일련번호가_겹치는_남의_표는_안_끊는다(self, conn):
+        """⚠️ 판례와 헌재결정례는 일련번호가 겹칠 수 있다. `피인용종류` 없이 ID 로만
+        가르면 멀쩡한 헌재 링크가 함께 끊긴다."""
+        self._판단둘(conn)
+        저장.본문지우기(conn, "판례", ["P1"])
+        assert conn.execute(
+            "SELECT 피인용자료ID FROM 인용판례 WHERE 피인용종류='헌재결정례'"
+        ).fetchone()[0] == "P1"
+
+
+class Test철회:
+    def test_본문을_지우고_원장에_남긴다(self, conn):
+        """⚠️ **행을 남기고 표지만 다는 옛 정책을 뒤집었다.** 새 뷰에 철회 표지가 없어서,
+        행을 남기면 **철회된 판단이 정상 판단처럼 보인다.**"""
+        저장.저장(conn, "판례", {"판례ID": "P1", "사건번호": "2024다1"})
+        assert 저장.철회기록(conn, "판례", ["P1"]) == 1
+        assert conn.execute("SELECT COUNT(*) FROM 판례").fetchone()[0] == 0
+        assert 저장.철회된것(conn, "판례") == {"P1"}
+
+    def test_철회와_없음이_한_자료에_함께_남지_않는다(self, conn):
+        """⚠️ 둘 다 "원천에 본문이 없다"의 기록이라, 양쪽에 남으면 적재 등식이 같은 행을
+        두 번 기대해 **고칠 수 없는 빨간불**이 된다."""
+        저장.저장(conn, "판례", {"판례ID": "P1", "사건번호": "2024다1"})
+        저장.record_failure(conn, "판례", "P1", "없음", "일치하는 판례가 없습니다")
+        저장.철회기록(conn, "판례", ["P1"])
+        assert conn.execute(
+            "SELECT COUNT(*) FROM 수집실패 WHERE 자료ID='P1'").fetchone()[0] == 1
+
+    def test_본문을_다시_받으면_표지가_지워진다(self, conn):
+        저장.저장(conn, "판례", {"판례ID": "P1", "사건번호": "2024다1"})
+        저장.철회기록(conn, "판례", ["P1"])
+        저장.저장(conn, "판례", {"판례ID": "P1", "사건번호": "2024다1"})
+        assert 저장.철회된것(conn, "판례") == set()
 
 
 class Test트랜잭션:
@@ -294,29 +319,33 @@ class Test트랜잭션:
     트랜잭션을 시작하지 않는다.** 실제로 그렇게 써 놨었고, 블록 중간에 터져도 이미 쓴 것이
     그대로 남았다. 반쪽 레코드가 영구 커밋되고 다음 실행이 그걸 완성된 것으로 본다."""
 
+    def _센다(conn):
+        return conn.execute("SELECT COUNT(*) FROM 판례").fetchone()[0]
+
     def test_예외가_나면_되돌린다(self, conn):
         with pytest.raises(RuntimeError):
             with 연결.트랜잭션(conn):
                 conn.execute(
-                    "INSERT INTO 메타 (키, 값) VALUES ('시험', '1')"
-                    " ON CONFLICT(키) DO UPDATE SET 값='1'"
-                )
+                    "INSERT INTO 판례 (판례ID, 사건번호, 수집일시)"
+                    " VALUES ('시험', 'x', 'x')")
                 raise RuntimeError("중간에 터진다")
-        assert 저장.메타읽기(conn, "시험") is None
+        assert Test트랜잭션._센다(conn) == 0
 
     def test_with_conn_은_되돌리지_않는다(self, conn):
         # 이 테스트는 **왜 트랜잭션() 이 필요한지**를 잠근다. 여기가 깨지면
         # 파이썬 sqlite3 의 동작이 바뀐 것이므로 트랜잭션() 을 다시 검토해야 한다.
         with pytest.raises(RuntimeError):
             with conn:
-                conn.execute("INSERT INTO 메타 (키, 값) VALUES ('시험2', '1')")
+                conn.execute(
+                    "INSERT INTO 판례 (판례ID, 사건번호, 수집일시)"
+                    " VALUES ('시험2', 'x', 'x')")
                 raise RuntimeError("x")
-        assert 저장.메타읽기(conn, "시험2") == "1"
+        assert Test트랜잭션._센다(conn) == 1
 
     def test_저장이_중간에_터지면_아무것도_안_남는다(self, conn):
         # 자식 삽입에서 터뜨린다 — 부모만 남으면 재개가 그걸 완성된 것으로 보고 건너뛴다.
         with pytest.raises(Exception):
-            저장.저장(conn, "법령", _법령(), {"조문": [{"조문키": "x"}]})
+            저장.저장(conn, "법령", _법령(), {"조문": [{"순서": 0}]})
         assert conn.execute("SELECT COUNT(*) FROM 법령").fetchone()[0] == 0
 
 
@@ -329,10 +358,10 @@ class Test날짜검증:
          ("42841231", "1951-12-31"),     # 단기(檀紀) → 서기. 판례 선고일자 45건
          ("2026.04.16", "2026-04-16"),
          ("20260416", "2026-04-16"),
-         ("199919", None),               # 6자리. 행정규칙 시행일자 1건이 이 값이다
-         ("20240600", None),             # 일=00. 행정심판례 의결일자 1건
+         ("199919", None),               # 6자리
+         ("20240600", None),             # 일=00
          ("20030337", None),             # 일=37. 인용판례 피인용선고일 1건
-         ("99991231", "9999-12-31"),     # 만료 없음의 센티널. 행정규칙 시행일자 1,695건
+         ("99991231", "9999-12-31"),     # 만료 없음의 센티널
          ("", None), (None, None), ("이상한값", None)],
     )
     def test_달력에_없는_값과_단기를_거른다(self, 값, 기대):
@@ -342,8 +371,8 @@ class Test날짜검증:
 
     @pytest.mark.parametrize("값", ["2026-04-16", "1951-12-31", "9999-12-31"])
     def test_이미_ISO_면_그대로다(self, 값):
-        """⚠️ **이게 이행의 멱등성을 떠받친다.** 마이그레이션이 저장된 값에 이 함수를
-        다시 먹이는 방식이라, 여기서 두 번째 통과가 값을 바꾸면 매일 조금씩 달라진다."""
+        """⚠️ **멱등이어야 한다.** 변환 스크립트가 저장된 값에 이 함수를 다시 먹이므로,
+        여기서 두 번째 통과가 값을 바꾸면 값이 매번 조금씩 달라진다."""
         assert 정규화.날짜(값) == 값
 
 
@@ -427,42 +456,82 @@ class Test스키마출력:
 
 
 class Test실패원장:
-    def test_비어_있는_것이_정상이다(self, conn):
+    def test_재시도는_비어_있는_것이_정상이다(self, conn):
         assert conn.execute("SELECT COUNT(*) FROM 수집실패").fetchone()[0] == 0
 
     def test_같은_대상을_다시_적으면_시도횟수가_는다(self, conn):
-        저장.record_failure(conn, "판례", "1", "네트워크", "타임아웃")
-        저장.record_failure(conn, "판례", "1", "네트워크", "또 타임아웃")
+        저장.record_failure(conn, "판례", "1", "재시도", "타임아웃")
+        저장.record_failure(conn, "판례", "1", "재시도", "또 타임아웃")
         r = conn.execute("SELECT 시도횟수, 메시지 FROM 수집실패").fetchone()
         assert r[0] == 2 and r[1] == "또 타임아웃"
 
-    def test_없음은_재시도_대상에서_빠진다(self, conn):
-        """⚠️ 재시도하면 매일 수만 건을 헛되이 두드린다."""
-        저장.record_failure(conn, "판례", "없는것", "없음", "일치하는 판례가 없습니다")
-        저장.record_failure(conn, "판례", "실패한것", "네트워크", "타임아웃")
+    def test_실패종류가_바뀌면_시도횟수가_1_로_돌아간다(self, conn):
+        """⚠️ '재시도' 3회를 쌓은 자료가 '목록누락'으로 바뀌면서 그 3을 물려받으면,
+        연속 누락 상한이 **첫 누락에서 이미 채워져** 하루 유예가 통째로 우회된다."""
+        for _ in range(3):
+            저장.record_failure(conn, "판례", "1", "재시도", "타임아웃")
+        저장.record_failure(conn, "판례", "1", "목록누락", "완결 목록에 없다")
+        assert conn.execute("SELECT 시도횟수 FROM 수집실패").fetchone()[0] == 1
+
+    @pytest.mark.parametrize("실패종류", ["없음", "본문없음", "철회"])
+    def test_본문이_없다는_기록은_재시도_대상에서_빠진다(self, conn, 실패종류):
+        """⚠️ 셋 다 원천의 답이라 다시 물어도 같은 답이 온다 — 재시도하면 매일 수만 건을
+        헛되이 두드린다."""
+        저장.record_failure(conn, "판례", "없는것", 실패종류, "…")
+        저장.record_failure(conn, "판례", "실패한것", "재시도", "타임아웃")
         assert 저장.없음인것(conn, "판례") == {"없는것"}
 
     def test_성공하면_지워진다(self, conn):
-        저장.record_failure(conn, "판례", "1", "네트워크")
+        저장.record_failure(conn, "판례", "1", "재시도")
         저장.clear_failure(conn, "판례", "1")
         assert conn.execute("SELECT COUNT(*) FROM 수집실패").fetchone()[0] == 0
 
 
-class Test진행상태:
+class Test수집상태:
     def test_기록하고_읽는다(self, conn):
-        저장.상태기록(conn, "판례", "목록", 1, "완료", 1000)
-        assert 저장.상태읽기(conn, "판례", "목록", 1) == "완료"
-        assert 저장.상태읽기(conn, "판례", "목록", 2) is None
+        저장.상태기록(conn, "판례", "목록", "완료", 1000)
+        assert 저장.상태읽기(conn, "판례", "목록") == "완료"
+        assert 저장.상태읽기(conn, "판례", "정리") is None
 
-    def test_같은_키를_다시_기록하면_덮어쓴다(self, conn):
-        저장.상태기록(conn, "판례", "목록", 1, "진행")
-        저장.상태기록(conn, "판례", "목록", 1, "완료", 1000)
-        assert 저장.상태읽기(conn, "판례", "목록", 1) == "완료"
+    def test_자료종류_단계마다_한_행이다(self, conn):
+        """실행 이력이 아니라 **지금 상태**다. 이력을 쌓으면 "지금 어떤가"를 묻는
+        질의가 매번 정렬과 LIMIT 을 달아야 한다."""
+        저장.상태기록(conn, "판례", "목록", "부분", 900)
+        저장.상태기록(conn, "판례", "목록", "완료", 1000)
+        행 = conn.execute("SELECT 상태, 건수 FROM 수집상태").fetchall()
+        assert [tuple(r) for r in 행] == [("완료", 1000)]
 
-    def test_메타(self, conn):
-        assert 저장.메타읽기(conn, "스키마버전") == 이행.스키마버전
-        저장.메타쓰기(conn, "파서버전", "2")
-        assert 저장.메타읽기(conn, "파서버전") == "2"
+    def test_같은_상태가_이어지면_시작_시각이_보존된다(self, conn):
+        """⚠️ `갱신일시` 는 매 실행 덮인다. 며칠째 이 상태인지는 `상태시작일시` 만 안다."""
+        저장.상태기록(conn, "판례", "정리", "부분")
+        시작 = conn.execute("SELECT 상태시작일시 FROM 수집상태").fetchone()[0]
+        저장.상태기록(conn, "판례", "정리", "부분")
+        assert conn.execute("SELECT 상태시작일시 FROM 수집상태").fetchone()[0] == 시작
+
+    def test_상태가_바뀌면_시작_시각이_다시_잡힌다(self, conn):
+        저장.상태기록(conn, "판례", "정리", "부분")
+        저장.상태기록(conn, "판례", "정리", "완료", 0)
+        r = conn.execute("SELECT 갱신일시, 상태시작일시 FROM 수집상태").fetchone()
+        assert r[0] == r[1]
+
+    def test_기준선은_자격이_있을_때만_갈린다(self, conn):
+        """⚠️ 부분 수신·급감이 기준선을 덮으면 다음 실행이 그 낮은 값과 비교해 통과하고,
+        크기 가드가 **삭제를 하루 늦추는 것 이상을 못 한다.**"""
+        저장.기준선기록(conn, "판례", 1000, 갱신=True, 검증된목록=True)
+        assert 저장.기준선읽기(conn, "판례") == 1000
+        저장.기준선기록(conn, "판례", 400, 갱신=True, 검증된목록=False)
+        assert 저장.기준선읽기(conn, "판례") == 1000
+        assert 저장.상태읽기(conn, "판례", "목록") == "부분"
+        저장.기준선기록(conn, "판례", 400, 갱신=False, 검증된목록=True)
+        assert 저장.기준선읽기(conn, "판례") == 1000
+        assert 저장.상태읽기(conn, "판례", "목록") == "이상"
+
+    def test_수집끝냈다가_신선도의_적재기준시각이_된다(self, conn):
+        """⚠️ **행을 하나도 안 썼어도 적는다.** 밀린 것이 없어 조용히 끝난 실행과 수집기가
+        며칠째 안 도는 상태는 전혀 다른 일인데, 행이 있을 때만 적으면 둘이 똑같아 보인다."""
+        assert conn.execute("SELECT 적재기준시각 FROM 신선도").fetchone()[0] is None
+        저장.수집끝냈다(conn)
+        assert conn.execute("SELECT 적재기준시각 FROM 신선도").fetchone()[0]
 
 
 class Test마이그레이션:

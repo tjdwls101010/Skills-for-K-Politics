@@ -155,7 +155,23 @@ def 트랜잭션(conn: sqlite3.Connection):
     실측으로 재현했다 — `with conn:` 안에서 INSERT 후 예외를 던지면 행이 남아 있다.
     그러면 "자식을 지우고 다시 넣는" 저장이 중간에 죽었을 때 **옛 자식만 지워진 반쪽
     레코드가 영구 커밋되고**, 부모가 있다는 이유로 다음 실행이 그걸 건너뛴다.
+
+    ⚠️ **겹쳐 열 수 있다.** 스스로 원자적인 함수(`철회기록` 등)를 더 큰 원자 단위 안에서
+    부르는 일이 실제로 있는데, `BEGIN` 을 두 번 치면 `cannot start a transaction within
+    a transaction` 으로 죽는다. 안쪽은 SAVEPOINT 로 열어 **바깥 트랜잭션의 일부**가 되게
+    한다 — 안쪽만 되감아도 바깥은 살아 있고, 바깥이 되감기면 안쪽도 함께 사라진다.
     """
+    if conn.in_transaction:
+        conn.execute("SAVEPOINT 중첩")
+        try:
+            yield conn
+        except BaseException:
+            conn.execute("ROLLBACK TO 중첩")
+            conn.execute("RELEASE 중첩")
+            raise
+        else:
+            conn.execute("RELEASE 중첩")
+        return
     conn.execute("BEGIN IMMEDIATE")
     try:
         yield conn

@@ -14,19 +14,27 @@ from law import source as 원천
 
 
 class Test봉투표:
-    """`01-원천-실측.md` §3 의 12개 값. 규칙으로 유도하면 반드시 둘 중 하나에서 틀린다."""
+    """실측한 봉투 값들. 규칙으로 유도하면 반드시 둘 중 하나에서 틀린다.
+
+    ⚠️ **DB 에 담는 네 종만 여기 있다.** 행정규칙·행정심판례·자치법규는 `direct.py` 가
+    실시간으로 부르고, 그쪽 target 은 `live/commands.py` 의 `커맨드` 표가 갖는다 —
+    두 표가 갈려 있는 것이 "이 DB 에 있나 없나"를 코드에서 읽을 수 있게 하는 경계다.
+    """
 
     기대 = {
         "법령": ("law", "LawSearch", "law", "법령"),
         "판례": ("prec", "PrecSearch", "prec", "PrecService"),
         "헌재결정례": ("detc", "DetcSearch", "Detc", "DetcService"),
-        "행정심판례": ("decc", "Decc", "decc", "PrecService"),
         "법령해석례": ("expc", "Expc", "expc", "ExpcService"),
-        "행정규칙": ("admrul", "AdmRulSearch", "admrul", "AdmRulService"),
     }
 
-    def test_여섯_종이_전부_있다(self):
+    def test_네_종이_전부_있다(self):
         assert set(원천.봉투) == set(원천.자료종류.전체) == set(self.기대)
+
+    def test_DB_밖_자료는_봉투표에_없다(self):
+        """⚠️ 여기 남아 있으면 수집기가 그 종류를 다시 받기 시작해도 아무 신호가 없다 —
+        `저장.본문테이블` 에 없으니 저장만 조용히 실패한다."""
+        assert not {"행정규칙", "행정심판례"} & set(원천.봉투)
 
     @pytest.mark.parametrize("종류", 기대)
     def test_봉투와_리스트키가_실측표와_같다(self, 종류):
@@ -41,20 +49,15 @@ class Test봉투표:
             if k != "헌재결정례"
         )
 
-    def test_decc_본문봉투가_판례와_같다(self):
-        assert 원천.봉투["행정심판례"].본문봉투 == 원천.봉투["판례"].본문봉투 == "PrecService"
-
-    def test_행정심판례만_목록과_본문의_ID_필드명이_다르다(self):
-        assert 원천.봉투["행정심판례"].목록식별자 == "행정심판재결례일련번호"
-        # 다른 다섯은 목록 필드명이 본문 테이블의 일련번호 이름과 같은 계열이다
+    def test_목록식별자를_본문_이름으로_짐작하지_않는다(self):
+        """⚠️ 원천이 목록과 본문에 다른 이름을 쓰는 일이 잦다. 같다고 가정하면 `None` 을
+        ID 로 써서 본문 조회가 **전량** 실패한다 — 목록 수집은 성공하므로 한참 뒤에야
+        드러난다. 그래서 표에 명시한다."""
+        assert all(i.목록식별자 for i in 원천.봉투.values())
         assert 원천.봉투["판례"].목록식별자 == "판례일련번호"
 
     def test_판례는_datSrcNm_이_기본으로_걸린다(self):
         assert 원천.목록기본["판례"]["datSrcNm"] == "대법원"
-
-    def test_행정규칙은_nw1_이_현행이다(self):
-        # ⚠️ eflaw 는 2가 시행예정인데 admrul 은 2가 연혁이다. 뜻이 반대다.
-        assert 원천.목록기본["행정규칙"]["nw"] == "1"
 
 
 class Test단수복수정규화:
@@ -85,8 +88,8 @@ class Test봉투분류:
         몸통 = 원천.분류(p, "헌재결정례", "목록")
         assert 원천.행들(몸통.get(원천.봉투["헌재결정례"].리스트키)) == [{"a": 1}]
 
-    def test_행정심판례_본문은_PrecService_봉투다(self):
-        assert 원천.분류({"PrecService": {"이유": "…"}}, "행정심판례", "본문") == {"이유": "…"}
+    def test_판례_본문은_PrecService_봉투다(self):
+        assert 원천.분류({"PrecService": {"판례내용": "…"}}, "판례", "본문") == {"판례내용": "…"}
 
     def test_0건이면_리스트키_자체가_없다(self):
         p = {"LawSearch": {"resultMsg": "success", "totalCnt": "0", "target": "law"}}

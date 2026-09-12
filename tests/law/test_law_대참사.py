@@ -23,31 +23,22 @@ def 백업마당(tmp_path, monkeypatch, db_path):
 
 
 def _채운다(conn, 건수=100):
-    """핵심표 일곱을 전부 채운다 — 하나만 채우면 나머지가 0이라 가드가 헛짚는다."""
+    """핵심표 다섯을 전부 채운다 — 하나만 채우면 나머지가 0이라 가드가 헛짚는다."""
     때 = "2026-08-28 00:00:00"
     for i in range(건수):
         conn.execute(
-            "INSERT INTO 법령 (법령일련번호, 법령ID, 법령명, 법종구분, 현행연혁코드,"
-            " 시행일자, 수집일시) VALUES (?,?,?, '법률', '현행', '2020-01-01', ?)",
-            (i, i, f"법률{i}", 때))
+            "INSERT INTO 법령 (법령ID, 법령일련번호, 법령명, 법종구분, 시행일자, 수집일시)"
+            " VALUES (?,?,?, '법률', '2020-01-01', ?)", (i, i, f"법률{i}", 때))
         conn.execute(
-            "INSERT INTO 조문 (법령일련번호, 순서, 조문키, 조문번호, 조문가지번호,"
-            " 조문내용, 전문, 조문여부) VALUES (?,?,?,?,0,'내용','내용','조문')",
-            (i, i, f"{i}-0", i))
-        conn.execute("INSERT INTO 판례 (판례일련번호, 사건번호, 수집일시) VALUES (?,?,?)",
+            "INSERT INTO 조문 (법령ID, 순서, 조, 가지, 전문) VALUES (?,0,?,0,'내용')", (i, i))
+        conn.execute("INSERT INTO 판례 (판례ID, 사건번호, 수집일시) VALUES (?,?,?)",
                      (i, f"2020다{i}", 때))
         conn.execute(
-            "INSERT INTO 헌재결정례 (헌재결정례일련번호, 사건번호, 수집일시) VALUES (?,?,?)",
+            "INSERT INTO 헌재결정례 (헌재결정례ID, 사건번호, 전문, 수집일시) VALUES (?,?,'전문',?)",
             (i, f"2020헌바{i}", 때))
         conn.execute(
-            "INSERT INTO 행정심판례 (행정심판례일련번호, 사건번호, 수집일시) VALUES (?,?,?)",
-            (i, f"2020-{i}", 때))
-        conn.execute(
-            "INSERT INTO 법령해석례 (법령해석례일련번호, 안건명, 수집일시) VALUES (?,?,?)",
-            (i, f"해석{i}", 때))
-        conn.execute(
-            "INSERT INTO 행정규칙 (행정규칙일련번호, 행정규칙ID, 행정규칙명, 수집일시)"
-            " VALUES (?,?,?,?)", (i, i, f"규칙{i}", 때))
+            "INSERT INTO 법령해석례 (법령해석례ID, 안건번호, 안건명, 수집일시) VALUES (?,?,?,?)",
+            (i, f"20-{i:04d}", f"해석{i}", 때))
     conn.commit()
 
 
@@ -61,7 +52,7 @@ class Test축이_없으면_대참사가_초록이다:
         _채운다(conn)
         conn.commit()
         백업마당()
-        for t in ("조문", "판례", "헌재결정례", "행정심판례", "법령해석례", "행정규칙"):
+        for t in ("조문", "판례", "헌재결정례", "법령해석례"):
             conn.execute(f"DELETE FROM {t}")
         conn.execute("DELETE FROM 법령 WHERE 법령일련번호 <> 0")
         conn.commit()
@@ -82,8 +73,8 @@ class Test직전정상과_비교한다:
         conn.commit()
         백업마당()
         # ⚠️ 일련번호는 TEXT 다 — `< 5` 는 문자열 비교라 '10'·'49' 까지 걸린다(실측 45행).
-        conn.execute("DELETE FROM 판례 WHERE 판례일련번호 IN"
-                     " (SELECT 판례일련번호 FROM 판례 LIMIT 5)")   # 5%
+        conn.execute("DELETE FROM 판례 WHERE 판례ID IN"
+                     " (SELECT 판례ID FROM 판례 LIMIT 5)")   # 5%
         conn.commit()
         assert _게이트(conn, "A27") == 0
 
@@ -91,8 +82,8 @@ class Test직전정상과_비교한다:
         _채운다(conn, 건수=100)
         conn.commit()
         백업마당()
-        conn.execute("DELETE FROM 판례 WHERE 판례일련번호 IN"
-                     " (SELECT 판례일련번호 FROM 판례 LIMIT 50)")
+        conn.execute("DELETE FROM 판례 WHERE 판례ID IN"
+                     " (SELECT 판례ID FROM 판례 LIMIT 50)")
         conn.commit()
         assert _게이트(conn, "A27") == 1
 
@@ -116,8 +107,8 @@ class Test직전정상과_비교한다:
 
 class Test원장이_줄어든_것은_사고가_아니다:
     """⚠️ **원장은 일이 끝나면 줄어드는 표다.** 그것을 급감으로 세면 **가장 잘 돌아간
-    날이 가장 빨갛다** — 실측으로 `수집실패 507→1`, `정리후보 15→2` 가 A27 을 빨갛게
-    만들었고, 정작 핵심표(법령 6,425 · 조문 310,021 · 판례 89,312)는 평평했다.
+    날이 가장 빨갛다** — 실측으로 `수집실패 507→1` 이 A27 을 빨갛게 만들었고, 정작
+    핵심표(법령 6,425 · 조문 310,021 · 판례 89,312)는 평평했다.
 
     ⚠️ **그렇다고 비교에서 빼지는 않는다.** 곁기록의 `행수` 는 감사가 DB 밖에서 잡는
     유일한 축이라, 목록에서 지우면 빨강만이 아니라 **상세에서도 사라져** 그 표에 대해
@@ -126,15 +117,16 @@ class Test원장이_줄어든_것은_사고가_아니다:
 
     def _원장을_채운다(self, conn, 건수):
         conn.executemany(
-            "INSERT INTO 정리후보 (자료종류, 자료ID, 연속누락, 최초누락일시, 최종누락일시)"
-            " VALUES ('법령', ?, 1, 'x', 'x')", [(f"P{i}",) for i in range(건수)])
+            "INSERT INTO 수집실패 (자료종류, 자료ID, 실패종류, 시도횟수, 최초일시, 최종일시)"
+            " VALUES ('법령', ?, '목록누락', 1, 'x', 'x')",
+            [(f"P{i}",) for i in range(건수)])
         conn.commit()
 
-    def test_정리후보가_줄어도_A27_은_초록이다(self, conn, db_path, 백업마당):
+    def test_원장이_줄어도_A27_은_초록이다(self, conn, db_path, 백업마당):
         _채운다(conn)
         self._원장을_채운다(conn, 100)
         백업마당()
-        conn.execute("DELETE FROM 정리후보")
+        conn.execute("DELETE FROM 수집실패")
         conn.commit()
         assert _게이트(conn, "A27") == 0
 
@@ -142,11 +134,11 @@ class Test원장이_줄어든_것은_사고가_아니다:
         _채운다(conn)
         self._원장을_채운다(conn, 100)
         백업마당()
-        conn.execute("DELETE FROM 정리후보")
+        conn.execute("DELETE FROM 수집실패")
         conn.commit()
         _, 보, _ = 감사.run(conn)
         값 = str(next(v for 번호, _, v in 보 if 번호 == "R24"))
-        assert "정리후보" in 값, "판정에서 뺐다고 눈에서도 없애면 축이 꺼진 것이다"
+        assert "수집실패" in 값, "판정에서 뺐다고 눈에서도 없애면 축이 꺼진 것이다"
         assert "원장" in 값, "판정 대상이 아니라는 표시가 없으면 사람이 빨강으로 읽는다"
 
     def test_원장이_아닌_표는_그대로_빨갛다(self, conn, db_path, 백업마당):
@@ -154,7 +146,7 @@ class Test원장이_줄어든_것은_사고가_아니다:
         _채운다(conn)
         self._원장을_채운다(conn, 100)
         백업마당()
-        conn.execute("DELETE FROM 정리후보")
+        conn.execute("DELETE FROM 수집실패")
         conn.execute("DELETE FROM 판례")
         conn.commit()
         assert _게이트(conn, "A27") == 1
@@ -170,20 +162,26 @@ class Test감사판정이_DB_에_남는다:
     수집기가 판정을 한 줄로 남겨야 훅이 그걸 읽는다."""
 
     def test_감사만_돌려도_판정이_남는다(self, conn, db_path):
-
         _채운다(conn, 건수=3)
         conn.commit()
         assert 실행._main(["--감사만", "--db", str(db_path)]) in (0, 1)
-        값 = conn.execute("SELECT 값 FROM 메타 WHERE 키='마지막감사'").fetchone()
-        assert 값 is not None, "감사가 돌았는데 판정이 아무 데도 안 남았다"
-        assert 값[0] in ("통과", "위반")
+        행 = conn.execute(
+            "SELECT 상태, 건수 FROM 수집상태 WHERE 자료종류='전체' AND 단계='감사'").fetchone()
+        assert 행 is not None, "감사가 돌았는데 판정이 아무 데도 안 남았다"
+        assert 행[0] == "완료" and 행[1] is not None
 
-    def test_빨간_게이트는_위반으로_남는다(self, conn, db_path):
+    def test_빨간_게이트는_위반_건수와_이름으로_남는다(self, conn, db_path):
+        """⚠️ **상세는 게이트 번호가 아니라 이름이다.** `.schema` 만 읽는 조회자가
+        'A3=1' 을 풀 수단이 없다 — 그러면 `신선도.감사상세` 가 "뭔가 어긋났다"까지만 말한다."""
         _채운다(conn, 건수=3)
-        conn.execute("INSERT INTO 수집실패 (자료종류, 자료ID, 실패종류, 최종시도일시)"
-                     " VALUES ('판례','1','막힘', '2026-08-28 00:00:00')")
+        conn.execute("INSERT INTO 수집실패 (자료종류, 자료ID, 실패종류, 최초일시, 최종일시)"
+                     " VALUES ('판례','1','재시도','2026-08-28 00:00:00','2026-08-28 00:00:00')")
         conn.commit()
 
         실행._main(["--감사만", "--db", str(db_path)])
-        assert conn.execute(
-            "SELECT 값 FROM 메타 WHERE 키='마지막감사'").fetchone()[0] == "위반"
+        상태, 건수, 상세 = conn.execute(
+            "SELECT 상태, 건수, 상세 FROM 수집상태"
+            " WHERE 자료종류='전체' AND 단계='감사'").fetchone()
+        assert (상태, 건수 > 0) == ("완료", True)
+        assert "재시도" in 상세 and "A3" not in 상세
+        assert conn.execute("SELECT 감사통과 FROM 신선도").fetchone()[0] == 0

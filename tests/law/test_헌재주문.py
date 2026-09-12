@@ -96,12 +96,12 @@ def test_줄_끝_주석이_붙은_컬럼도_붙는다() -> None:
     """
     conn = _빈DB()
     선언 = [l for l in 스키마.SCHEMA.splitlines()
-           if re.match(r"^  상태시작일시\s+TEXT", l)]
+           if re.match(r"^  위임수집판본\s+TEXT", l)]
     assert 선언 and "--" in 선언[0], (
-        "이 검사는 `수집상태.상태시작일시` 선언 줄 끝의 주석을 전제로 한다 — 주석이"
-        " 사라지면 아무것도 안 잰다. 줄 끝 주석이 달린 다른 컬럼으로 앵커를 옮겨라")
-    conn.execute("ALTER TABLE 수집상태 DROP COLUMN 상태시작일시")
-    assert 이행.컬럼보강(conn) == ["수집상태.상태시작일시"]
+        "이 검사는 `법령.위임수집판본` 선언 줄 끝의 주석을 전제로 한다 — 주석이"
+        " 사라지면 아무것도 안 잰다. 줄 끝 주석이 달린 다른 NULL 허용 컬럼으로 앵커를 옮겨라")
+    conn.execute("ALTER TABLE 법령 DROP COLUMN 위임수집판본")
+    assert 이행.컬럼보강(conn) == ["법령.위임수집판본"]
 
 
 def test_컬럼보강은_두_번_돌려도_같다() -> None:
@@ -118,56 +118,45 @@ def test_컬럼보강_뒤에_migrate_가_주석을_갈아_끼운다() -> None:
     언제나 맨 뒤에 붙으므로, 가운데 컬럼을 떼고 보강하면 컬럼 순서가 `SCHEMA` 와 갈려
     `migrate()` 가 구조불일치로 물러난다 — 그러면 검사가 이름과 다른 것을 잰다. 여기서
     재는 것은 **실제 업그레이드 경로**(옛 DB → 새 컬럼 → 주석)다.
+
+    앵커가 `법령.위임수집판본` 인 이유는 그것이 **표의 마지막 컬럼**이면서 줄 끝 주석을
+    갖기 때문이다. 가운데 컬럼을 고르면 위 이유로 이 검사가 성립하지 않는다.
     """
     import re
 
-    # 컬럼 줄과 그 위에 붙은 주석 줄을 걷고, 그러면서 앞 컬럼에 남는 쉼표를 뗀다
-    # (`…,\n);` 가 되면 DDL 이 안 읽힌다). 기존 주석은 들여쓰기가 달라 정규식 하나로는
-    # 안 잡히므로 줄 단위로 센다.
-    줄 = 스키마.SCHEMA.split("\n")
+    줄 = 스키마.SCHEMA.split(chr(10))
     남길 = []
     for 하나 in 줄:
-        if 하나.startswith("  원천철회일   TEXT"):
-            while 남길 and 남길[-1].lstrip().startswith("--"):
-                남길.pop()
-            # 주석은 컬럼 줄 끝에 인라인이다(한 주장 한 줄). 뗀 컬럼이 마지막이었으면
-            # 앞 컬럼의 쉼표(주석 앞)를 함께 뗀다 — 안 그러면 `…,  -- 주석\n);` 로 DDL 이 안 읽힌다.
-            if not re.match(r"  원천철회일   TEXT\s*,", 하나) and 남길:
-                남길[-1] = re.sub(r",(?=\s*--)|,\s*$", "", 남길[-1], count=1)
+        if 하나.startswith("  위임수집판본 TEXT"):
+            # 주석은 컬럼 줄 끝에 인라인이다(한 주장 한 줄). 뗀 컬럼이 마지막 컬럼이면
+            # 앞 컬럼의 쉼표는 CHECK 절이 뒤에 있어 그대로 둬도 DDL 이 읽힌다.
             continue
         남길.append(하나)
-    옛 = "\n".join(남길)
-    # 뷰도 그 컬럼을 읽으므로 함께 옛 모양으로 되돌린다 — 안 그러면 없는 컬럼을 읽는
-    # 뷰가 만들어져, 이 검사가 재려는 것과 무관한 데서 깨진다.
-    옛 = re.sub(r"\(EXISTS \(SELECT 1 FROM 판례 p.*?AS 원천철회", "0 AS 원천철회",
-               옛, flags=re.S)
-    assert "원천철회일" not in 옛 and 옛 != 스키마.SCHEMA
+    옛 = chr(10).join(남길)
+    assert "위임수집판본" not in 옛 and 옛 != 스키마.SCHEMA
     conn = 연결.connect(":memory:")
     conn.executescript(옛)
 
-    assert "헌재결정례.원천철회일" in 이행.컬럼보강(conn)
+    assert "법령.위임수집판본" in 이행.컬럼보강(conn)
     # ⚠️ **표식을 손으로 적지 않고 `SCHEMA` 에서 뽑는다.** 문구를 손댄 날 리터럴 앵커는
     #    `not in` 과 `in` 을 **둘 다 통과시켜** 조용히 무의미해진다(실제로 그랬다).
-    # 주석은 컬럼 줄 끝에 인라인이다 — 헌재결정례의 원천철회일 줄에서 그 문장을 뽑는다.
     표식 = next(l for l in 스키마.SCHEMA.splitlines()
-              if l.startswith("  원천철회일   TEXT")).split("--", 1)[1].strip()
+              if l.startswith("  위임수집판본 TEXT")).split("--", 1)[1].strip()
     assert len(표식) > 20, 표식
-    sql = conn.execute(
-        "SELECT sql FROM sqlite_master WHERE name='헌재결정례'").fetchone()[0]
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE name='법령'").fetchone()[0]
     assert 표식 not in sql, "ALTER 만으로 주석이 붙을 리 없다"
-    assert "헌재결정례" in 이행.migrate(conn, 백업확인=False)["주석교체"]
-    sql = conn.execute(
-        "SELECT sql FROM sqlite_master WHERE name='헌재결정례'").fetchone()[0]
+    assert "법령" in 이행.migrate(conn, 백업확인=False)["주석교체"]
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE name='법령'").fetchone()[0]
     assert 표식 in sql
 
 
 def test_재파싱이_저장된_전문에서_주문을_다시_만든다() -> None:
-    """⚠️ 이게 없으면 `주문추출` 을 고칠 때마다 헌재 38,672건을 다시 받아야 한다.
-    참조 파싱을 ③단계로 뗀 것과 같은 이유다(D13)."""
+    """⚠️ 이게 없으면 `주문추출` 을 고칠 때마다 헌재 전량을 다시 받아야 한다.
+    참조 파싱을 별도 단계로 뗀 것과 같은 이유다."""
 
     conn = _빈DB()
     conn.execute(
-        "INSERT INTO 헌재결정례 (헌재결정례일련번호, 사건번호, 전문, 수집일시)"
+        "INSERT INTO 헌재결정례 (헌재결정례ID, 사건번호, 전문, 수집일시)"
         " VALUES ('1','2009헌바17','【주 문】 형법 제241조는 헌법에 위반된다.【이 유】 1. 개요','x')")
     assert conn.execute("SELECT 주문 FROM 헌재결정례").fetchone()[0] is None
     assert 심판례.주문재추출(conn) == 1

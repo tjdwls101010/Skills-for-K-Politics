@@ -1,6 +1,6 @@
 """DB 에 없는 것을 API 로 직접 부른다.
 
-⚠️ **DB 에 있는 자료의 커맨드는 여기 없다 — 일부러 없다.** `direct.py 판례 --검색` 같은 것이 생기면 완결적인 DB 를 두고 API 로 물어 **상위 N 건만 보고 답하게** 된다. 법령·판례·헌재결정례·행정심판례·법령해석례·행정규칙은 전부 SQL 로 조회한다.
+⚠️ **DB 에 있는 자료의 커맨드는 여기 없다 — 일부러 없다.** `direct.py 판례 --검색` 같은 것이 생기면 완결적인 DB 를 두고 API 로 물어 **상위 N 건만 보고 답하게** 된다. 법령·조문·판례·헌재결정례·법령해석례는 전부 SQL 로 조회한다.\n\n반대로 행정규칙·행정심판례·자치법규·조약은 **DB 에 없다.** 여기 있는 커맨드가 그 자료들에 닿는 유일한 길이다.
 
 ⚠️ **여기 결과는 DB 자료와 같은 신뢰도가 아니다.** 스냅샷이라 재현되지 않고 파싱 검증도 안 거친다. 답에 쓸 때는 출처를 밝혀라.
 """
@@ -18,7 +18,10 @@ from pathlib import Path
 from law import source as 원천  # noqa: E402
 from law import normalize as 정규화  # noqa: E402
 from law.live.attachment import 첨부텍스트
-from law.live.render import 렌더_연혁, 렌더_연혁본문, 렌더_별표검색, 렌더_행정규칙별표검색, 렌더_별표목록, _별표찾기, _첨부링크, 첨부필요, 렌더_별표본문
+from law.live.render import (
+    렌더_연혁, 렌더_연혁본문, 렌더_별표검색, 렌더_행정규칙별표검색, 렌더_별표목록,
+    _별표찾기, _첨부링크, 첨부필요, 렌더_별표본문, 렌더_행정규칙검색, 렌더_행정규칙본문,
+)
 
 # 자료종류(한국어) → (엔드포인트, target, 고정 파라미터, 도움말)
 #
@@ -39,6 +42,11 @@ from law.live.render import 렌더_연혁, 렌더_연혁본문, 렌더_별표검
     "별표목록": ("본문", "law", {}, "법령·행정규칙 본문 API의 별표 목록 (--법령일련번호 또는 --행정규칙일련번호)"),
     "별표본문": ("본문", "law", {}, "별표 텍스트 (--법령일련번호 또는 --행정규칙일련번호, --별표)"),
     "조약":     ("검색", "trty",       {},         "조약 (--검색). DB 에 없다"),
+    # ⚠️ `nw` 는 target 마다 뜻이 반대다. admrul 은 1=현행 2=연혁, eflaw 는 2=시행예정 3=현행.
+    "행정규칙": ("검색", "admrul", {"nw": 1},
+              "고시·훈령·예규·지침 (--검색 또는 --부처). DB 에 없다"),
+    "행정규칙본문": ("본문", "admrul", {},
+                "행정규칙 전문 (--행정규칙일련번호). DB 에 없다"),
 }
 
 # ⚠️ **`--범위 본문` 이 없으면 별표는 제목만 뒤진다.** 원천의 기본값이 제목 검색이라
@@ -64,7 +72,8 @@ def _main(argv: list[str] | None = None) -> int:
     ap.add_argument("--조", help="연혁본문에서 읽을 조 (예: 28의2)")
     ap.add_argument("--부칙", action="store_true", help="연혁본문의 부칙 전문")
     ap.add_argument("--별표", help="별표본문에서 읽을 번호 (예: 1의5)")
-    ap.add_argument("--행정규칙일련번호", help="별표목록·별표본문의 행정규칙 ID")
+    ap.add_argument("--행정규칙일련번호", help="행정규칙본문·별표목록·별표본문의 행정규칙 ID")
+    ap.add_argument("--부처", help="행정규칙 검색의 소관부처 (예: 금융위원회)")
     ap.add_argument("--첨부", action="store_true", help="별표본문을 인라인 텍스트 대신 첨부에서 추출")
     ap.add_argument("--원본", action="store_true", help="렌더링 대신 원본 JSON을 자르지 않고 한 줄로 출력")
     ap.add_argument("--저장", type=Path, help="원본 JSON을 파일에도 저장")
@@ -82,6 +91,17 @@ def _main(argv: list[str] | None = None) -> int:
         q["search"] = _범위코드[a.범위]
     if a.법령일련번호:
         q["MST"] = a.법령일련번호
+    if a.자료종류 == "행정규칙본문":
+        if not a.행정규칙일련번호:
+            ap.error("행정규칙본문은 --행정규칙일련번호 가 필요하다")
+        q["ID"] = a.행정규칙일련번호
+    if a.부처:
+        if a.자료종류 != "행정규칙":
+            ap.error("--부처 는 행정규칙 검색에만 쓴다")
+        # ⚠️ **부처만 주고 검색어를 안 주면 원천이 0건을 준다.** `query` 가 필수라서인데
+        #    0건은 "그 부처에 행정규칙이 없다"로 읽힌다. 부처 이름 자체를 질의로 쓴다.
+        q.setdefault("query", a.부처)
+        q["org"] = a.부처
     if a.자료종류 in ("별표목록", "별표본문"):
         if bool(a.법령일련번호) == bool(a.행정규칙일련번호):
             ap.error("--법령일련번호 또는 --행정규칙일련번호 하나가 필요하다")
@@ -104,8 +124,8 @@ def _main(argv: list[str] | None = None) -> int:
     if 엔드 == "검색":
         q["display"] = a.건수 if a.건수 is not None else (100 if a.자료종류 == "연혁" else 20)
 
-    if not (a.법령 or a.검색 or a.법령일련번호 or a.행정규칙일련번호):
-        ap.error("--법령 · --검색 · --법령일련번호 중 하나는 있어야 한다")
+    if not (a.법령 or a.검색 or a.법령일련번호 or a.행정규칙일련번호 or a.부처):
+        ap.error("--법령 · --검색 · --법령일련번호 · --행정규칙일련번호 · --부처 중 하나는 있어야 한다")
 
     with 원천.Client(rate=8) as c:
         payload = c._json(원천.검색 if 엔드 == "검색" else 원천.본문, q)
@@ -150,7 +170,8 @@ def _main(argv: list[str] | None = None) -> int:
                     return 1
         else:
             렌더러 = {"연혁": 렌더_연혁, "별표": 렌더_별표검색,
-                    "행정규칙별표": 렌더_행정규칙별표검색, "별표목록": 렌더_별표목록}
+                    "행정규칙별표": 렌더_행정규칙별표검색, "별표목록": 렌더_별표목록,
+                    "행정규칙": 렌더_행정규칙검색, "행정규칙본문": 렌더_행정규칙본문}
             글 = 렌더러[a.자료종류](payload) if a.자료종류 in 렌더러 else 원본
     except (LookupError, ValueError) as e:
         print(f"🔴 {e}", file=sys.stderr)

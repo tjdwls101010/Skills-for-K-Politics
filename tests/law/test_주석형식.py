@@ -13,11 +13,19 @@ from pathlib import Path
 
 from law import schema as 스키마
 
-A0_스키마문자수 = 48953   # 2026-09-11 기준선: `load.py schema` 출력 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
+A0_스키마문자수 = 20411   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
 
 
 def _주석줄들():
-    return [줄 for 줄 in 스키마.SCHEMA.splitlines() if 줄.lstrip().startswith("--")]
+    """독립 `--` 줄과 컬럼 뒤 인라인 `--` 주석을 모두 본다 — 새 DDL 은 인라인 주석이 대부분이라
+    독립 줄만 보면 검사가 대다수 주석을 지나친다. 문자열 리터럴 안의 `--` 는 주석이 아니므로 제외한다."""
+    줄들 = []
+    for 줄 in 스키마.SCHEMA.splitlines():
+        밖 = re.sub(r"'(?:[^']|'')*'", "''", 줄)
+        i = 밖.find("--")
+        if i >= 0:
+            줄들.append(줄[i:] if 줄.lstrip().startswith("--") else 줄[len(줄) - len(밖[i:]):])
+    return 줄들
 
 
 def test_이어지는_줄이_없다():
@@ -27,7 +35,7 @@ def test_이어지는_줄이_없다():
 
 
 def test_한_줄에_경고는_하나다():
-    둘 = [줄 for 줄 in 스키마.SCHEMA.splitlines() if 줄.count("⚠") > 1]
+    둘 = [줄 for 줄 in _주석줄들() if 줄.count("⚠") > 1]
     assert 둘 == []
 
 
@@ -68,13 +76,3 @@ def test_관리자_좌표를_가리키지_않는다(좌표):
     남음 = [줄 for 줄 in 스키마.SCHEMA.splitlines() if re.search(좌표, 줄)]
     assert 남음 == [], "\n".join(남음)
 
-
-def test_열린_값_집합은_확인하는_법으로_말한다():
-    assert "SELECT DISTINCT 위임구분" in 스키마.SCHEMA
-
-
-def test_수집실패_포인터가_원천_컬럼_이름을_쓴다():
-    """`대상종류` 는 사라진 스냅샷 통합표의 이름이었다 — 이 DB 의 컬럼은 `자료종류` 다.
-    없는 컬럼을 가리키는 포인터는 따라간 사람을 `no such column` 으로 보낸다."""
-    assert "수집실패의 자료종류='위임행정규칙'" in 스키마.SCHEMA
-    assert "대상종류" not in 스키마.SCHEMA
