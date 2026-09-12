@@ -88,11 +88,23 @@ class Test인증키:
         (tmp_path / ".env").write_text("CONGRESS_API_KEY=from-file\n", encoding="utf-8")
         assert net.load_key(tmp_path / ".env") == "from-env"
 
-    def test_키가_없으면_요청_전에_터진다(self, tmp_path, monkeypatch):
-        """키 없이 보내면 200 에 `INFO-300` 이 온다 — 요청을 다 돌고 나서 알게 된다."""
+    def test_아무것도_없으면_기본값으로_떨어진다(self, tmp_path, monkeypatch):
+        """국회 인증키는 무료·공개 값이라 커밋해 뒀다(성진, 2026-09-12). **감출 것이 아니라서다.**
+
+        ⚠️ 시크릿으로 두면 감춰지지도 않으면서 **새 기계마다 등록해야 하는 단계와
+        "키가 없어 빈손 수집"이라는 실패 유형만 는다.** 셀프호스티드 러너는 자기
+        `_work` 아래 새 체크아웃에서 도는데 `.env` 는 gitignore 라 거기 안 딸려 온다.
+        """
         monkeypatch.delenv("CONGRESS_API_KEY", raising=False)
-        with pytest.raises(RuntimeError, match="CONGRESS_API_KEY"):
-            net.load_key(tmp_path / "없는.env")
+        assert net.load_key(tmp_path / "없는.env") == net.기본키
+        assert net.기본키
+
+    def test_빈_값은_기본값을_덮지_않는다(self, tmp_path, monkeypatch):
+        """빈 키로 보내면 200 에 `INFO-300` 이 온다 — 요청을 다 돌고 나서야 알게 된다.
+        빈 환경변수·빈 `.env` 줄은 "키를 안 준 것"이지 "빈 키를 준 것"이 아니다."""
+        monkeypatch.setenv("CONGRESS_API_KEY", "")
+        (tmp_path / ".env").write_text("CONGRESS_API_KEY=\n", encoding="utf-8")
+        assert net.load_key(tmp_path / ".env") == net.기본키
 
 
 class 가짜시계:

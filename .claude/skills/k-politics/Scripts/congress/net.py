@@ -51,11 +51,26 @@ class 원천에없음(APIError):
     """
 
 
-def load_key(env_path: Path | None = None) -> str:
-    """인증키. 환경변수가 `.env` 를 이긴다 — 자동화가 키를 주입하는 유일한 수단이다.
+# 국회 OpenAPI 인증키. 무료이고 가입만 하면 누구나 받는다.
+#
+# **일부러 커밋해 둔다 — 법제처 OC(`law/source.py`) 와 같은 이유다.** 감출 것이 아닌 값을
+# 시크릿으로 두면 감춰지지도 않으면서 **새 기계마다 등록해야 하는 단계와 "키가 없어 빈손
+# 수집"이라는 실패 유형만 는다.** 특히 셀프호스티드 러너는 자기 `_work` 아래 새 체크아웃에서
+# 도는데 `.env` 는 gitignore 라 거기 안 딸려 온다 — `.env` 에만 두면 자동 수집이 인증 실패한다.
+#
+# ⚠️ 대가는 하나 — 공개된 키로 누가 원천을 두드리면 **계정 단위로 막힐 수 있다.**
+#    받아들이기로 한 위험이다(성진, 2026-09-12). 막히면 `CONGRESS_API_KEY` 환경변수로
+#    다른 계정을 주면 된다.
+기본키 = "7d7811f4377240bca05c93c6a30755f8"
 
-    ⚠️ **키 없이 보내면 200 에 `INFO-300` 이 온다.** 요청을 다 돌고 나서 알게 되므로
-    여기서 먼저 터뜨린다.
+
+def load_key(env_path: Path | None = None) -> str:
+    """인증키. 환경변수 → `.env` → 기본값 순서다.
+
+    앞의 둘은 **다른 계정으로 갈아타는 수단**이지 비밀을 넣는 수단이 아니다.
+
+    ⚠️ **키 없이 보내면 200 에 `INFO-300` 이 온다.** 요청을 다 돌고 나서야 알게 되므로
+    빈 값은 여기서 걸러 기본키로 떨어뜨린다.
     """
     if key := os.environ.get("CONGRESS_API_KEY"):
         return key
@@ -64,10 +79,9 @@ def load_key(env_path: Path | None = None) -> str:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line.startswith("CONGRESS_API_KEY=") and not line.startswith("#"):
-                return line.split("=", 1)[1].strip().strip("\"'")
-    raise RuntimeError(
-        f"CONGRESS_API_KEY 가 없다. 환경변수로 주거나 {path} 에 넣어라."
-    )
+                if value := line.split("=", 1)[1].strip().strip("\"'"):
+                    return value
+    return 기본키
 
 
 def unwrap(payload: dict, api: str) -> tuple[list[dict], int]:
