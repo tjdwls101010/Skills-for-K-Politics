@@ -356,3 +356,34 @@ class Test시행대기가섞인다:
             "SELECT sql FROM sqlite_master WHERE name='법률안현행조문'").fetchone()[0]
         assert "시행대기 = 0" in ddl
         assert "여기 없는 법률안이 두 종류다" in ddl
+
+
+class Test감사시각:
+    """감사는 **수집 파이프라인이 돌 때만** 원장에 기록된다. `audit.py` 를 손으로 돌려도 안 쓴다.
+
+    그래서 `감사통과=0` 만 보여 주면 8일 전 실패가 오늘 실패처럼 읽힌다 — 실측에서 정확히
+    그랬다(원장은 09-04 의 `A11=1`, 그날 실제 감사는 15/15 초록).
+    """
+
+    def test_감사시각을_담는다(self, 빌드):
+        _, conn, _ = 빌드
+        시각 = conn.execute(
+            "SELECT 감사시각 FROM 신선도 WHERE 코퍼스='국회'").fetchone()[0]
+        assert 시각 == "2026-09-04 06:45:59"
+
+    def test_법령은_메타의_마지막감사일시를_쓴다(self, tmp_path, 원천국회, 원천법령, 소관기관DB):
+        c = sqlite3.connect(원천법령)
+        c.execute("INSERT INTO 메타 VALUES ('마지막감사일시','2026-09-12 08:27:57')")
+        c.commit()
+        c.close()
+        출력 = tmp_path / "법3.db"
+        snapshot.build(원천국회, 원천법령, 소관기관DB, 출력)
+        conn = sqlite3.connect(f"file:{출력}?mode=ro", uri=True)
+        assert conn.execute(
+            "SELECT 감사시각 FROM 신선도 WHERE 코퍼스='법령'").fetchone()[0] == "2026-09-12 08:27:57"
+        conn.close()
+
+    def test_주석이_적재기준시각과의_간극을_말한다(self, 빌드):
+        _, conn, _ = 빌드
+        ddl = conn.execute("SELECT sql FROM sqlite_master WHERE name='신선도'").fetchone()[0]
+        assert "적재기준시각" in ddl.split("감사시각")[1].split("감사상세")[0]
