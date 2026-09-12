@@ -1,0 +1,22 @@
+# 이 파일은 **테스트 실행만** 정의한다. 수집 스크립트는 PEP 723 인라인 의존성을 유지한다 —
+# 각 진입점이 단독으로 `uv run <경로>.py` 로 돌아야 self-hosted 러너의 워크플로가 성립한다.
+# 명령은 하나로 고정: `uv run --group test pytest -q`. test.yml·.github/scripts·문서가 같은 것을 쓴다.
+
+[project]
+name = "skills-for-k-politics"
+version = "0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+test = [
+  "pytest",
+  "httpx[http2]>=0.27",
+  "selectolax>=0.3",
+  "pyyaml",
+  "pypdf",
+  "olefile",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

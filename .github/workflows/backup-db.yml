@@ -1,0 +1,168 @@
+name: DB 백업
+
+# **이 레포에 사본은 이것뿐이다.** LAW 3.6GiB · CONGRESS 0.6GiB 는 `.gitignore` 에 막혀
+# 있고 스냅숏도 Time Machine 도 없다(실측 2026-08-28: `tmutil destinationinfo` →
+# `No destinations configured.`). 그런데 매 실행이 라이브 DB 를 직접 고치고, 법령은
+# 컬럼 DROP 을 포함한 이행을 그 위에서 돈다.
+#
+# **수집보다 먼저 돈다.** 02:40 KST — 국회 04:00 · 법령 06:00 앞이다. 순서가 이래야
+# `이행()` preflight(1단계)가 "24시간 이내 검증된 백업"을 늘 손에 쥔다. 뒤로 돌리면
+# 파괴적 이행이 백업 없이 돌 수 있는 창이 매일 열린다.
+#
+# **정각을 피한다.** GitHub 의 예약은 정각에 부하가 몰려 밀린다 — 실측으로 8/26 법령
+# 예약이 3시간 23분 밀려 다음 날에 돌았고 그날 자리는 결번이 됐다.
+#
+# 판단의 근거와 실측표(왜 `cp` 도 `.backup` 도 아닌 `VACUUM INTO` 인가, 왜 원본은
+# `mode=ro` 이고 사본은 `immutable=1` 인가)는 전부 `백업.py` 머리말에 있다.
+# **여기 옮겨 적지 않는다** — 두 곳에 적으면 한쪽만 고치게 된다.
+
+on:
+  schedule:
+    - cron: "40 17 * * *"    # 02:40 KST
+  workflow_dispatch:
+    inputs:
+      # ⚠️ **입력 이름은 ASCII 여야 한다.** `${{ }}` 식 문법이 속성 접근에 ASCII
+      #    식별자만 받으므로, 한글 이름을 쓰면 **워크플로 파일 자체가 무효**가 된다.
+      #    무효한 워크플로는 예약이 아예 안 돌고, 대신 푸시마다 "invalid workflow
+      #    file" 실패 실행이 하나씩 생길 뿐이다 — 실측으로 이 파일이 그 상태로
+      #    7번 푸시되는 동안 **예약 백업이 한 번도 안 돌았다.** 설명은 한글로 둔다.
+      restore_verify:
+        description: "세대를 실제로 복원해 integrity_check 와 감사를 돌린다"
+        type: boolean
+        default: false
+
+concurrency:
+  group: corpus-db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    # 원본도 보관 폴더도 이 맥에 있다. 클라우드 러너에는 둘 다 없다.
+    runs-on: self-hosted
+    # 실측 2026-08-28: 두 코퍼스 합계 89초(VACUUM 28 + 감사 41 + iCloud 반출). 60분은
+    # 그 40배다 — 수집과 러너를 공유해 큐 대기가 길 수 있지만 timeout 은 실행 시간만
+    # 세므로 넉넉히 잡아도 손해가 없다.
+    timeout-minutes: 60
+    env:
+      # ⚠️ **체크아웃 안을 겨누지 마라.** `actions/checkout` 이 `git clean -ffdx` 를 도는데
+      #    `-x` 가 gitignore 된 파일까지 지운다. DB 는 절대 경로가 겨눈다.
+      LAW_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/원천/법령.db
+      CONGRESS_DB: /Users/seongjin/Coding/Skills for K-Politics/.claude/skills/k-politics/DBs/원천/국회.db
+      # 사다리는 내장 디스크(여유 135GiB), 반출은 iCloud 최신 2세대(잔여 24.2GiB).
+      # 한 세대가 4.3GiB 라 사다리 전체는 iCloud 에 애초에 안 들어간다.
+      CORPUS_BACKUP_DIR: /Users/seongjin/Library/Application Support/Congress-DB/백업
+      CORPUS_BACKUP_MIRROR: /Users/seongjin/Library/Mobile Documents/com~apple~CloudDocs/백업/Congress-DB
+
+    steps:
+      # ⚠️ **commit SHA 로 고정한다.** `@v4` 는 이동 가능한 태그라 같은 이름이
+      #    다른 코드를 가리키게 바뀔 수 있고, 이 잡은 self-hosted 라 그 코드가
+      #    **내 맥에서** 돈다. 올릴 때는 SHA 를 손으로 바꾼다.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: 백업
+        id: backup
+        run: |
+          # ⚠️ **`caffeinate` 를 빼지 마라.** 러너가 도는 맥은 유휴 절전이 켜져 있어 잡이
+          #    뜬 뒤에 잠들고, 그러면 "runner lost communication" 으로 죽는다.
+          #    `-d`·`-u` 는 새벽에 화면을 켜므로 뺀다.
+          set +e
+          set -o pipefail
+          PYTHONUNBUFFERED=1 caffeinate -ims uv run .claude/skills/k-politics/Scripts/backup.py 2>&1 | tee backup.txt
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: 복원 검증
+        id: restore
+        # 일요일과 수동 요청에만. **「업로드됨」은 백업이 아니다** — 백업이라고 부를 수 있는
+        # 유일한 근거는 다시 열어 감사가 도는 것이고, 그건 열어 보기 전까지 아무도 모른다.
+        # ⚠️ 백업이 실패해도 돈다(`always`). 오늘 못 떴을 때야말로 **어제 것이 쓸 만한지**를
+        #    알아야 하는 날이다.
+        if: always()
+        run: |
+          set +e
+          # 예약 실행은 일요일에만. 수동으로는 체크박스가 정한다.
+          # 판정을 YAML 식이 아니라 셸에 두는 이유 — `inputs.restore_verify` 는 예약 실행에서
+          # 빈 문자열이라 표현식 안에서 조용히 거짓이 되고, 그 조용함이 "일요일에도 안 돌던"
+          # 종류의 결함을 만든다. 여기서는 건너뛴 사실이 로그에 남는다.
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.restore_verify }}" != "true" ]; then
+            if [ "$(TZ=Asia/Seoul date +%u)" != "7" ]; then
+              echo "code=skip" >> "$GITHUB_OUTPUT"
+              echo "일요일도 아니고 요청받지도 않았다 — 건너뛴다." | tee restore.txt
+              exit 0
+            fi
+          fi
+          caffeinate -ims uv run .claude/skills/k-politics/Scripts/backup.py --복원검증 2>&1 | tee restore.txt
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # 원본의 시크릿 검사 가드는 아래에 보존한다. 공개 기본키를 쓰는 이 레포에서는 해당 스텝과 판정·로그를 제거한다.
+        # ⚠️ **이 검사가 도는 자리는 여기뿐이다.** 같은 테스트가 PR 에도 있지만 PR 은
+        #    `ubuntu-latest` 에서 돌아 `.env` 도 러너 `.credentials` 도 **없고**, 그러면
+        #    둘 다 skip 된다 — 초록인데 아무것도 안 잰 것이다. 검사 대상이 이 맥에만
+        #    사니 이 맥에서 도는 예약 잡에 달아야 실제로 재진다.
+        #
+        # **한 번 조이는 것으로 끝나지 않는 종류다.** `.env` 는 gitignore 라 git 이 모드를
+        # 추적하지 않고, 다시 만들면 그때의 umask(기본 022)가 0644 를 준다. 러너도
+        # 재등록할 때마다 `.credentials` 를 0644 로 다시 쓴다.
+          # ⚠️ **러너의 체크아웃에는 `.env` 가 없다.** gitignore 라 `actions/checkout` 이
+          #    안 가져오고, 러너는 `_work/CONGRESS-DB/` 에 따로 체크아웃한다(실측: 러너
+          #    작업공간에 `.env` 0개). 검사할 곳을 일러 주지 않으면 **여기서도 skip 되어
+          #    초록인데 아무것도 안 잰다** — 이 검사가 두 번째로 미끄러질 뻔한 자리다.
+          #    지목했는데 못 찾으면 테스트가 실패한다.
+
+      - name: 요약
+        if: always()
+        run: |
+          # 자동 백업은 아무도 안 보고 있다. **사흘 뒤에 "언제부터 이상해졌나"에 답할 수
+          # 있어야 하므로** 실행 중이 아니라 실행 후에 읽힐 것을 전제로 쓴다.
+          {
+            echo "## DB 백업 · $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')"
+            echo
+            case "${{ steps.backup.outputs.code }}" in
+              0) echo "🟢 두 코퍼스 다 승격됐다" ;;
+              *) echo "🔴 **승격하지 못한 코퍼스가 있다** — 사람이 봐야 한다" ;;
+            esac
+            echo
+            echo '```'
+            cat backup.txt 2>/dev/null || echo "(백업 로그가 없다)"
+            echo '```'
+            echo
+            echo "### 보관 현황"
+            echo '```'
+            caffeinate -ims uv run .claude/skills/k-politics/Scripts/backup.py --상태 2>&1 || true
+            echo '```'
+            if [ -s restore.txt ]; then
+              echo
+              echo "### 복원 검증"
+              echo '```'
+              cat restore.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        if: always()
+        with:
+          name: backup-${{ github.run_number }}
+          path: |
+            backup.txt
+            restore.txt
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: 판정 전파
+        if: always()
+        # ⚠️ **판정을 파이프 너머로 넘기지 마라.** `백업.py | tee` 는 셸이 마지막 명령의
+        #    종료코드를 돌려주므로 실패의 1 이 tee 의 0 으로 덮인다. 위에서 `pipefail`
+        #    과 `PIPESTATUS` 로 각각 건져 온 것이 그 이유다.
+        run: |
+          b=${{ steps.backup.outputs.code || 1 }}
+          r=${{ steps.restore.outputs.code || 0 }}
+          # ⚠️ **셋을 한 줄의 빨강으로 뭉치지 마라.** "백업이 안 떴다"와 "파일 모드가
+          #    풀렸다"는 사람이 할 일이 전혀 다르다. 잡은 어차피 하나로 빨개지므로
+          #    구별은 이 메시지가 진다.
+          [ "$b" != "0" ] && { echo "::error::백업이 승격되지 않았다($b)"; exit 1; }
+          [ "$r" != "0" ] && [ "$r" != "skip" ] && \
+            { echo "::error::복원 검증 실패($r) — 사본이 열리지 않거나 감사가 빨갛다"; exit 1; }
+          exit 0

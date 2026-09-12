@@ -1,0 +1,78 @@
+name: 수집 워치독
+
+on:
+  schedule:
+    - cron: "37 2 * * *"
+  workflow_dispatch:
+    inputs:
+      stale_hours:
+        description: "마지막으로 잘 된 지 이 시간을 넘으면 이슈를 연다"
+        required: false
+
+jobs:
+  watch:
+    # ⚠️ **`self-hosted` 로 두면 안 된다.** 감시 대상이 그 맥이므로 러너가 죽는 순간
+    #    워치독도 같이 죽어 아무 소용이 없다. 감시자는 맥 **밖**에 있어야 한다.
+    runs-on: ubuntu-latest
+    permissions:
+      # 이슈를 열고 닫는다. 안 주면 `gh issue create` 가 403 으로 죽고 알림이 사라진다.
+      issues: write
+      actions: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      # ⚠️ **예약이 하루 1회인데 30 이면 여유가 여섯 시간뿐이다.** GitHub 의 예약은
+      #    정각 부하로 흔히 밀리므로 정상 지연 한 번이 곧 빨간불이 되고, 늑대를 부르는
+      #    감시자는 **다음 진짜 신호도 같이 잃는다.**
+      STALE_HOURS: ${{ inputs.stale_hours || '36' }}
+
+    steps:
+      # ⚠️ **commit SHA 로 고정한다.** `@v4` 는 이동 가능한 태그라 같은 이름이
+      #    다른 코드를 가리키게 바뀔 수 있고, 이 잡은 self-hosted 라 그 코드가
+      #    **내 맥에서** 돈다. 올릴 때는 SHA 를 손으로 바꾼다.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - name: 마지막으로 언제 잘 됐나
+        id: watch
+        run: |
+          # ⚠️ **워크플로마다 따로 본다.** 하나로 묶으면 한쪽만 죽었을 때 다른 쪽의
+          #    성공이 그걸 가린다 — 감시자가 감시 대상을 덮어 주는 셈이다.
+          # ⚠️ **자기 자신은 `:run` 이다.** 수집이 멈춰서 자기가 빨개진 것 때문에
+          #    다음 날 자기도 늙은 것으로 세어지면 문제 하나가 둘로 불어난다.
+          # 아래는 원본의 진단 감시 가드다. 이 레포는 예약 원천 진단을 이관하지 않아 감시 목록에서도 제외한다.
+          # ⚠️ **원천 진단도 감시 대상이다.** 수집은 멈추면 DB 가 안 자라 언젠가 눈에
+          #    띄지만, `kosis-check` 는 안 돌아도 조회가 그대로 되고 답도 그대로 나온다 —
+          #    **틀린 전제 위에서.** 감시받지 않는 진단은 있다고 믿는 진단이다.
+          # ⚠️ **백업도 감시 대상이다.** 옆 레포에서 백업 잡이 `-wal` 조건 때문에 조용히
+          #    죽어 있었고 아무도 몰랐다 — 감시받지 않는 백업은 있다고 믿는 백업이라
+          #    없는 것보다 나쁘다. 이 레포에 사본은 그것뿐이다.
+          set +e
+          .github/scripts/watchdog.sh \
+            collect-congress.yml:success collect-law.yml:success backup-db.yml:success \
+            watchdog.yml:run > 판정.md
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+          cat 판정.md
+
+      - name: 이슈 본문을 짓는다
+        if: always()
+        run: |
+          {
+            echo "## 수집 워치독 · $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')"
+            echo
+            cat 판정.md
+            echo
+            echo "기준: 마지막으로 잘 된 지 ${STALE_HOURS}시간."
+            echo "[이 점검 실행](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          } > 이슈.md
+          cat 이슈.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 이슈로 알린다
+        # ⚠️ **신호는 이슈지 이 잡의 빨간불이 아니다.** 매일 빨간 X 를 하나 더 만들면
+        #    그게 곧 다음 번 무시의 원인이 된다 — 국회 수집이 6일 내리 빨갛다가
+        #    아무도 안 본 것이 그 결과다. 이상이 이어지는 동안 이슈는 하나이고 본문만
+        #    갱신되며, 정상으로 돌아오면 닫힌다.
+        #    이 잡이 빨간 것은 **점검이나 알림 자체가 못 돈** 경우로 남겨 둔다.
+        run: |
+          .github/scripts/notify.sh \
+            ${{ steps.watch.outputs.code == '0' && 'ok' || 'bad' }} 이슈.md
