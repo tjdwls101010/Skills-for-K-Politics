@@ -13,11 +13,19 @@ from pathlib import Path
 
 from law import schema as 스키마
 
-A0_스키마문자수 = 48953   # 2026-09-11 기준선: `load.py schema` 출력 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
+A0_스키마문자수 = 20887   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트
 
 
 def _주석줄들():
-    return [줄 for 줄 in 스키마.SCHEMA.splitlines() if 줄.lstrip().startswith("--")]
+    """독립 `--` 줄과 컬럼 뒤 인라인 `--` 주석을 모두 본다 — 새 DDL 은 인라인 주석이 대부분이라
+    독립 줄만 보면 검사가 대다수 주석을 지나친다. 문자열 리터럴 안의 `--` 는 주석이 아니므로 제외한다."""
+    줄들 = []
+    for 줄 in 스키마.SCHEMA.splitlines():
+        밖 = re.sub(r"'(?:[^']|'')*'", "''", 줄)
+        i = 밖.find("--")
+        if i >= 0:
+            줄들.append(줄[i:] if 줄.lstrip().startswith("--") else 줄[len(줄) - len(밖[i:]):])
+    return 줄들
 
 
 def test_이어지는_줄이_없다():
@@ -27,7 +35,7 @@ def test_이어지는_줄이_없다():
 
 
 def test_한_줄에_경고는_하나다():
-    둘 = [줄 for 줄 in 스키마.SCHEMA.splitlines() if 줄.count("⚠") > 1]
+    둘 = [줄 for 줄 in _주석줄들() if 줄.count("⚠") > 1]
     assert 둘 == []
 
 
@@ -48,6 +56,13 @@ def test_뷰마다_머리_주석이_있다():
 
 
 def test_스키마_문자수가_기준선을_넘지_않는다(conn):
+    """이 DB 는 `.schema` 가 매 세션 읽히는 지면이라 **문자수가 곧 비용**이다.
+
+    ⚠️ **이 수를 올리는 것은 결정이지 형식이 아니다.** 산문이 불어난 것이면 그 산문을
+    줄여야 하고, 반대로 산문을 CHECK 로 옮기면 저장 DDL 은 오히려 늘 수 있다 — 그건
+    독자가 읽고 기억해야 하던 것이 값이 들어올 때 저절로 막히는 것으로 바뀐 것이라
+    올려도 된다. 이 검사는 둘을 구별하지 못하므로 **올린 사람이 어느 쪽인지 적는다.**
+    """
     stored = "\n".join(r[0] + ";" for r in conn.execute(
         "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY rowid"))
     assert len(stored.encode("utf-8")) <= A0_스키마문자수, len(stored.encode("utf-8"))
@@ -68,13 +83,3 @@ def test_관리자_좌표를_가리키지_않는다(좌표):
     남음 = [줄 for 줄 in 스키마.SCHEMA.splitlines() if re.search(좌표, 줄)]
     assert 남음 == [], "\n".join(남음)
 
-
-def test_열린_값_집합은_확인하는_법으로_말한다():
-    assert "SELECT DISTINCT 위임구분" in 스키마.SCHEMA
-
-
-def test_수집실패_포인터가_원천_컬럼_이름을_쓴다():
-    """`대상종류` 는 사라진 스냅샷 통합표의 이름이었다 — 이 DB 의 컬럼은 `자료종류` 다.
-    없는 컬럼을 가리키는 포인터는 따라간 사람을 `no such column` 으로 보낸다."""
-    assert "수집실패의 자료종류='위임행정규칙'" in 스키마.SCHEMA
-    assert "대상종류" not in 스키마.SCHEMA

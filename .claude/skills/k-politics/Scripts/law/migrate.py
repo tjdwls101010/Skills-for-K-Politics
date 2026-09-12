@@ -1,12 +1,8 @@
-"""LAW.db 의 스키마 적용과 이행 — `init_schema`·`migrate`·`이행`, 그리고 `load.py` 의 CLI.
+"""LAW.db 의 스키마 적용 — `init_schema`·`컬럼보강`·`migrate`, 그리고 `load.py` 의 CLI.
 
-`이행()` 은 `스키마버전` 이 목표에 못 미치면 그 차이만큼 옮긴다. **멱등이다.**
+**버전 이행 기계는 없다.** 구조를 바꿀 일이 생기면 `_테이블재구축` 으로 그 표를 다시 만들고, 주석만 바뀌었으면 `migrate()` 가 카탈로그의 DDL 텍스트를 갈아 끼운다. 단계별 이행 함수를 쌓아 두지 않는 이유는, 한 번 쓰고 영영 안 도는 코드가 남아 다음 사람에게 "이 DB 는 여러 모양일 수 있다"고 잘못 말하기 때문이다 — 이 DB 는 항상 `SCHEMA` 한 모양이다.
 
-⚠️ **`init_schema()` 다음, `migrate()` 앞에 부른다.** 앞이어야 새 컬럼·새 테이블이 이미 있고, 뒤여야 구조를 다 옮긴 상태에서 주석이 갈아 끼워진다. 순서가 뒤집히면 `migrate()` 가 구조불일치로 물러나고 **주석이 DB 안에서 낡은 채로 남는다.**
-
-⚠️ **주석으로 백업을 요구하던 자리다. 이제 문이 대신 선다** — `백업확인=True` 면 신선한 검증본이 없을 때 아예 시작하지 않는다. 컬럼 DROP 과 테이블 재구축은 되돌릴 수 없고, 테이블 단위 트랜잭션은 있지만 상위 트랜잭션이 없어 중간에 끊기면 앞서 지운 컬럼은 돌아오지 않는다. 되돌릴 수단을 쥐기 전에 시작하지 않는 것이 유일한 방어다.
-
-⚠️ **문은 옮길 것이 실제로 있을 때만 선다.** 이행은 멱등이라 평소에는 곧바로 물러나는데, 그 no-op 앞에서도 백업을 요구하면 **백업이 하루 밀린 날 수집 전체가 멈춘다.**
+⚠️ **`migrate()` 는 구조가 같을 때만 주석을 바꾼다.** 구조가 다른 표는 손대지 않고 이름만 알린다. 그 표는 `_테이블재구축` 이 할 일이고, 재구축은 되돌릴 수 없어 `백업확인` 문 뒤에 있다.
 """
 
 from __future__ import annotations
@@ -18,8 +14,6 @@ import sqlite3
 import sys
 from law.schema import SCHEMA, _구조, _저장형, _테이블문, 드리프트질의
 from law.conn import SKILL_DIR, connect, db_path, now_kst, 락, 트랜잭션
-from law.store import 메타쓰기, 메타읽기
-from law.normalize import 날짜, 날짜컬럼, 법원명정규화, 선고정규화
 
 def 컬럼보강(conn: sqlite3.Connection, schema: str | None = None) -> list[str]:
     """`SCHEMA` 에 새로 생긴 컬럼을 기존 DB 에 붙인다. **덧붙이기만 한다.**
@@ -113,18 +107,6 @@ def _스키마적용(conn: sqlite3.Connection, script: str) -> None:
 
 def init_schema(conn: sqlite3.Connection) -> None:
     _스키마적용(conn, SCHEMA)
-    conn.execute(
-        "INSERT INTO 메타 (키, 값) VALUES ('스키마버전', ?)"
-        " ON CONFLICT(키) DO NOTHING",
-        (스키마버전,),
-    )
-
-
-스키마버전 = "3"
-
-
-# 파서를 고치면 이 값을 올린다. `collect.py --재파싱` 이 메타의 값과 비교해 전량 재파싱한다.
-파서버전 = "1"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -208,10 +190,10 @@ def migrate(conn: sqlite3.Connection, schema: str | None = None, *,
     return 결과
 
 
-# ── 이행 ─────────────────────────────────────────────────────
+# ── 구조 변경 도구 ───────────────────────────────────────────
 #
-# `migrate()` 가 **주석**을 갈아 끼운다면 이쪽은 **구조와 값**을 옮긴다. 둘을 나눈 것은
-# 위험이 다르기 때문이다 — 주석 교체는 매 실행 도는 무해한 일이고, 이행은 되돌릴 수 없다.
+# `migrate()` 가 **주석**을 갈아 끼운다면 `_테이블재구축` 은 **구조**를 바꾼다. 둘을 나눈 것은
+# 위험이 다르기 때문이다 — 주석 교체는 매 실행 도는 무해한 일이고, 재구축은 되돌릴 수 없다.
 
 
 def 스키마출력(explicit: str | os.PathLike[str] | None = None) -> tuple[str, str | None]:
@@ -245,34 +227,6 @@ def 스키마출력(explicit: str | os.PathLike[str] | None = None) -> tuple[str
         )
     return 본문, 경고
 
-
-def 이행(conn: sqlite3.Connection, 로그=lambda _: None, *,
-         백업확인: bool = True) -> dict[str, int]:
-    # ⚠️ **문자열로 비교하지 마라.** `"9" >= "10"` 이 참이라 **버전 10에서 이행을 통째로
-    #    건너뛴다** — 아무 에러 없이, 구조만 낡은 채로. 버전이 한 자리를 넘는 날 딱 한 번
-    #    조용히 터지는 종류라 그날 원인을 찾을 단서가 없다. 저장은 문자열이지만 비교는 수다.
-    # 성진: 선고 보강은 원문 NULL을 표지로 버전과 별개로 재개한다, 전체 판례 탐색이 병목이면 완료 메타와 재수집 경로를 함께 설계한다.
-    현재 = int(메타읽기(conn, "스키마버전") or "1")
-    목표 = int(스키마버전)
-    선고대상 = conn.execute(
-        "SELECT EXISTS (SELECT 1 FROM 판례 WHERE 선고원문 IS NULL AND 선고 IS NOT NULL)"
-    ).fetchone()[0]
-    if 현재 >= 목표 and not 선고대상:
-        return {}
-
-    if 백업확인:
-        _백업이_있어야_한다(conn)
-
-    수치: dict[str, int] = {}
-    if 현재 < 2:
-        수치 |= _이행_2(conn, 로그)
-    if 현재 < 3:
-        수치 |= _이행_3(conn, 로그)
-    if 선고대상:
-        수치["선고"] = _선고재작성(conn, 로그)
-    if 현재 < 목표:
-        메타쓰기(conn, "스키마버전", 스키마버전)
-    return 수치
 
 
 def _백업모듈():
@@ -308,148 +262,6 @@ def _백업이_있어야_한다(conn: sqlite3.Connection) -> None:
     m.이행전_확인("law", m.연파일(conn))
 
 
-# ⚠️ **지우는 이유가 '중복'이 아니라 '매 세션 읽는 지면'이다.** 이 DB 는 스키마 주석이
-#    곧 문서라 `.schema` 가 클로드의 컨텍스트에 매번 들어간다. 아래는 전부 **조건으로 걸
-#    것이 없는** 컬럼이다 — 상수(해석기관명 8,804행 전부 '법제처'), 파생(법원종류코드는
-#    법원명의 함수), 사실상 빔(처분청 35,045행 중 5행), 해독표 없는 코드(편장절관).
-#    필요해지면 원천에 그대로 있으니 다시 받는다.
-_지울컬럼: tuple[tuple[str, str], ...] = (
-    ("법령", "법령명한자"), ("법령", "편장절관"), ("법령", "전화번호"), ("법령", "법종구분코드"),
-    ("판례", "법원종류코드"),
-    ("행정심판례", "처분청"), ("행정심판례", "처분일자"),
-    ("법령해석례", "해석기관명"), ("법령해석례", "해석기관코드"),
-)
-
-
-# ⚠️ **이 셋은 `ALTER TABLE DROP COLUMN` 으로 못 지운다.** `id INTEGER PRIMARY KEY` 라
-#    SQLite 가 `cannot drop PRIMARY KEY column` 으로 거부한다. 통째로 다시 만드는 수밖에 없다.
-_재구축할테이블: tuple[str, ...] = ("의율조문", "인용판례", "파싱실패")
-
-
-# ⚠️ **D31 과 같은 기준을 남은 컬럼에 다시 적용한 결과다**(D38) — 지우는 이유가 '중복'이
-#    아니라 매 세션 읽는 지면이다. 여섯 다 파생이거나(이름과 완전 1:1), 읽을 표가 없는
-#    코드이거나, 절반 넘게 비어 있다. 근거 수치는 각 컬럼이 있던 자리의 주석에 남겼다.
-#
-# ⚠️ `법령.소관부처코드` 는 여기 없다 — `법령` 은 `CHECK` 때문에 어차피 재구축하므로
-#    그 재구축이 함께 떨어뜨린다. 여기 또 적으면 인덱스(`idx_법령_부처`)가 걸려 있어
-#    `DROP COLUMN` 이 거부당한다.
-_지울컬럼3: tuple[tuple[str, str], ...] = (
-    ("판례", "사건종류코드"),
-    ("헌재결정례", "사건종류코드"), ("헌재결정례", "재판부구분코드"),
-    ("행정심판례", "재결례유형코드"),
-    ("법령해석례", "질의기관코드"),
-    ("행정규칙", "행정규칙종류코드"),
-)
-
-
-# `CHECK` 을 붙이려고 다시 만든다. 앞의 둘은 FK 부모라 `_테이블재구축` 의 PRAGMA 방어가
-# 처음으로 실제 일을 하는 자리다.
-_재구축할테이블3: tuple[str, ...] = ("법령", "조문", "의율조문", "인용판례")
-
-
-def _이행_2(conn: sqlite3.Connection, 로그) -> dict[str, int]:
-    # ⚠️ **법원명 정규화가 `법원종류코드` 삭제보다 먼저다.** 지금 심급을 가릴 수단이
-    #    그 코드뿐인데, 이름이 224종으로 흔들려서다. 정규화가 들어와야 `법원명` 이 그
-    #    일을 대신한다. 순서가 뒤집히면 그 사이에 심급 필터가 사라진다.
-    수치 = {"날짜": _날짜재작성(conn, 로그), "법원명": _법원명재작성(conn, 로그)}
-    수치["컬럼삭제"] = _컬럼삭제(conn, 로그, _지울컬럼)
-    수치["재구축"] = _테이블재구축(conn, 로그, _재구축할테이블)
-    return 수치
-
-
-def _이행_3(conn: sqlite3.Connection, 로그) -> dict[str, int]:
-    """컬럼 7 · 테이블 1 을 지우고 `CHECK` 4 를 붙인다(D38·D41·D42).
-
-    ⚠️ **뷰는 여기서 만들지 않는다.** `init_schema()` 가
-    이미 만들었고, 재구축이 인덱스를 되살리며 한 번 더 만든다.
-
-    ⚠️ **그래서 뷰가 지울 컬럼을 참조하면 안 된다** — `현행법령`·`현행조문` 은 하나도
-    안 쓴다. 이 환경에서 뒤탈 없이 지나가는 것이 운이 아니라는 것을 실측으로 확인했다:
-    `legacy_alter_table` 기본값이 **연결마다 다르다.** Python 의 sqlite3(3.45.3)은 0 이라
-    뷰가 참조하는 컬럼의 `DROP COLUMN` 을 **거부하고 원상태를 지키는데**, 이 기기의
-    `sqlite3` CLI(3.51.0)는 1 이라 **DROP 이 성공하고 뷰만 깨진다.** 운영 경로는 Python
-    이지만 사람이 CLI 로 같은 일을 하면 결과가 다르므로, 어느 쪽이든 안전하도록 뷰가
-    지울 컬럼을 안 건드리게 두는 것이 실제 방어다. 감사 A24 가 매 실행 뷰를 조회해
-    지킨다 — **깨진 뷰는 조회할 때야 터지고 `integrity_check` 는 통과한다.**
-    """
-    수치 = {"테이블삭제": _행정규칙별표삭제(conn, 로그)}
-    수치["컬럼삭제"] = _컬럼삭제(conn, 로그, _지울컬럼3)
-    수치["재구축"] = _테이블재구축(conn, 로그, _재구축할테이블3)
-    _수집시각메타(conn, 로그)
-    _공간회수(conn, 로그)
-    return 수치
-
-
-def _행정규칙별표삭제(conn: sqlite3.Connection, 로그) -> int:
-    """75,384행 · 저장 620MiB(본체 619 + PK 인덱스 2). **크기가 이유가 아니라 닿는 경로가 이유다**(D42).
-
-    서식류(별지·서식·양식)가 60,394행이고 그 대부분이 빈 양식 표지다. 별표를 가진
-    행정규칙 13,183개 중 위임으로 법령에서 닿는 것은 2,097개(16%)뿐이었다.
-    실물이 필요하면 `direct.py 행정규칙별표`(원천 `admbyl`)로 나간다.
-    """
-    if not conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='행정규칙별표'"
-    ).fetchone():
-        return 0  # 이미 없다 — 멱등
-    n = conn.execute("SELECT COUNT(*) FROM 행정규칙별표").fetchone()[0]
-    conn.execute("DROP TABLE 행정규칙별표")
-    로그(f"  테이블 삭제 행정규칙별표 {n:,}행")
-    return 1
-
-
-def _수집시각메타(conn: sqlite3.Connection, 로그) -> None:
-    """`메타` 주석이 약속하던 두 키를 실물로 채운다.
-
-    ⚠️ **`최초수집일시` 는 데이터에서만 나온다.** 원천은 "우리가 언제 받았나"를 모르므로
-    한 번 놓치면 되찾을 방법이 없다. 여섯 테이블을 훑는 값비싼 질의(실측 5초)라
-    여기서 한 번만 하고, 이후에는 `수집끝냈다()` 가 싼 쪽만 갱신한다.
-    """
-    표 = ("법령", "판례", "헌재결정례", "행정심판례", "법령해석례", "행정규칙")
-    최초 = min(
-        (v for t in 표
-         if (v := conn.execute(f"SELECT MIN(수집일시) FROM {t}").fetchone()[0])),
-        default=None,
-    )
-    if 최초:
-        conn.execute(
-            "INSERT INTO 메타 (키, 값) VALUES ('최초수집일시', ?)"
-            " ON CONFLICT(키) DO NOTHING", (최초,)
-        )
-        로그(f"  최초수집일시 {최초}")
-    메타쓰기(conn, "마지막수집일시", 메타읽기(conn, "마지막수집일시") or now_kst())
-
-
-def _선고재작성(conn: sqlite3.Connection, 로그) -> int:
-    conn.create_function("_선고", 1, 선고정규화, deterministic=True)
-    with 트랜잭션(conn):
-        바뀜 = conn.execute(
-            "UPDATE 판례 SET 선고원문=선고, 선고=_선고(선고)"
-            " WHERE 선고원문 IS NULL AND 선고 IS NOT NULL"
-        ).rowcount
-    if 바뀜:
-        로그(f"  선고 원문 보존·정규화 {바뀜:,}행")
-    return 바뀜
-
-
-def _법원명재작성(conn: sqlite3.Connection, 로그) -> int:
-    """원천 표기를 `법원명원문` 으로 챙긴 **다음** `법원명` 을 정규화한다.
-
-    ⚠️ **순서가 뒤집히면 원천 표기가 영영 사라진다.** `법원명` 을 먼저 덮어쓰면
-    `법원명원문` 에 채울 원본이 이미 없다.
-    """
-    conn.create_function("_법원명", 1, 법원명정규화, deterministic=True)
-    with 트랜잭션(conn):
-        챙김 = conn.execute(
-            "UPDATE 판례 SET 법원명원문=법원명 WHERE 법원명원문 IS NULL"
-        ).rowcount
-        바뀜 = conn.execute(
-            "UPDATE 판례 SET 법원명=_법원명(법원명원문) WHERE 법원명 IS NOT _법원명(법원명원문)"
-        ).rowcount
-    if 챙김 or 바뀜:
-        로그(f"  법원명 원문 보존 {챙김:,}행 · 정규화 {바뀜:,}행")
-    return 바뀜
-
-
 def _공간회수(conn: sqlite3.Connection, 로그) -> None:
     """**`VACUUM` 없이는 회수한 620MiB 가 파일에 그대로 남는다.**
 
@@ -459,9 +271,8 @@ def _공간회수(conn: sqlite3.Connection, 로그) -> None:
     ⚠️ **트랜잭션 안에서는 실행할 수 없다.** `connect()` 가 autocommit 이라 여기서는
     되지만, 이 호출을 `트랜잭션()` 블록 안으로 옮기면 `cannot VACUUM from within a
     transaction` 으로 죽는다.
-    ⚠️ **원본만 한 여유 공간이 필요하다.** 모자라면 여기서 터지는데, 그때도 `스키마버전`
-    은 아직 안 올라간 상태라 다음 실행이 같은 자리에서 다시 시작한다 — 앞 단계들이
-    전부 멱등이라 성립하는 이야기다.
+    ⚠️ **원본만 한 여유 공간이 필요하다.** 모자라면 여기서 터지므로, 파일을 줄이는 것이 목적일
+    뿐인 이 단계는 앞 단계가 다 끝난 뒤 마지막에 부른다.
     """
     전 = conn.execute("SELECT page_count * page_size FROM pragma_page_count(),"
                       " pragma_page_size()").fetchone()[0]
@@ -470,24 +281,6 @@ def _공간회수(conn: sqlite3.Connection, 로그) -> None:
                       " pragma_page_size()").fetchone()[0]
     로그(f"  VACUUM {전 / 2**30:.2f}GB → {후 / 2**30:.2f}GB")
 
-
-def _컬럼삭제(conn: sqlite3.Connection, 로그, 목록: tuple[tuple[str, str], ...]) -> int:
-    """⚠️ **인덱스가 걸린 컬럼은 못 지운다** — SQLite 가 `error in index … after drop
-    column` 으로 거부한다. 목록에 든 것이 전부 인덱스 밖이라는 것을 실측으로 확인했다.
-    새로 더할 때는 `sqlite_master` 를 먼저 봐라 — 인덱스가 걸렸으면 그 테이블을
-    `_테이블재구축` 쪽으로 보내는 것이 낫다(인덱스가 SCHEMA 대로 다시 만들어진다).
-    """
-    n = 0
-    for 테이블, 컬럼 in 목록:
-        if 컬럼 not in [r[1] for r in conn.execute(f"PRAGMA table_info({테이블})")]:
-            continue  # 이미 없다 — 멱등
-        conn.execute(f"ALTER TABLE {테이블} DROP COLUMN {컬럼}")
-        로그(f"  컬럼 삭제 {테이블}.{컬럼}")
-        n += 1
-    return n
-
-
-_인덱스명 = re.compile(r"CREATE\s+INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)", re.I)
 
 
 def _인덱스이름(ddl: str) -> str:
@@ -591,34 +384,6 @@ def _테이블재구축(conn: sqlite3.Connection, 로그, 테이블들: tuple[st
         raise RuntimeError(f"재구축 뒤 FK 위반: {위반[:20]}")
     return len(할것)
 
-
-def _날짜재작성(conn: sqlite3.Connection, 로그) -> int:
-    """저장된 날짜에 `날짜()` 를 **다시 먹인다.** 포맷 변환이 아니다.
-
-    ⚠️ **문자열을 잘라 하이픈만 끼우면 안 된다.** 적재 코드가 고쳐진 뒤에 들어온 값과
-    그 전에 들어온 값이 섞여 있어서, 실측하면 8자리가 아닌 것이 남아 있다 —
-    헌재 `'0'` 5,080 · 판례 단기 45 · 행정규칙 6자리 1 · 달력 밖 2건. 하이픈만 끼우면
-    `'0'` 은 `'-'` 가 되고 단기 4284년은 그대로 미래에 남는다.
-
-    ⚠️ **그래서 `날짜()` 를 SQLite 함수로 등록해 쓴다.** 적재와 이행이 같은 규칙을 보는
-    유일한 방법이고, 규칙을 고치면 다음 이행이 저절로 따라온다. 두 곳에 적으면
-    **게이트는 초록인데 값이 다른** 상태가 생긴다.
-    """
-    conn.create_function("_날짜", 1, 날짜, deterministic=True)
-    n = 0
-    # ⚠️ **컬럼마다 따로 커밋한다.** 4GB DB 에서 12개 컬럼 77만 행을 한 트랜잭션에 묶으면
-    #    WAL 이 수 GB 로 부푼다. 중간에 죽어도 이 함수가 멱등이라 다음 실행이 이어받고,
-    #    그 사이의 반쪽 상태는 감사 A19 가 빨갛게 잡는다.
-    for 테이블, 컬럼 in 날짜컬럼:
-        with 트랜잭션(conn):
-            바뀜 = conn.execute(
-                f"UPDATE {테이블} SET {컬럼} = _날짜({컬럼})"
-                f" WHERE {컬럼} IS NOT _날짜({컬럼})"
-            ).rowcount
-        if 바뀜:
-            로그(f"  날짜 {테이블}.{컬럼} {바뀜:,}행")
-        n += 바뀜
-    return n
 
 
 def _main(argv: list[str] | None = None) -> int:
