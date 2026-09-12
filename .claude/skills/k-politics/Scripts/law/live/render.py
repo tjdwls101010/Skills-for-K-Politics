@@ -125,7 +125,7 @@ def 렌더_별표본문(payload, 별표):
 
 
 def 렌더_행정규칙검색(payload):
-    행들 = 원천.행들(payload.get("AdmRulSearch", {}).get("admrul"))
+    행들 = 원천.행들((payload.get("AdmRulSearch") or {}).get("admrul"))
     줄들 = ["행정규칙명 종류 소관부처 발령일자 시행일자 현행 일련번호"]
     for 행 in 행들:
         줄들.append(" ".join(str(v or "-") for v in (
@@ -140,7 +140,11 @@ def 렌더_행정규칙본문(payload):
     아니라 **문자열 하나**로 온다 — 배열로 알고 순회하면 글자 단위로 돌아 본문이 세로로
     한 글자씩 찍힌다. 에러 없이.
     """
-    기본 = payload.get("행정규칙기본정보") or {}
+    # ⚠️ **본문은 `AdmRulService` 봉투에 싸여 온다.** 벗기지 않으면 모든 필드가 비어
+    #    제목도 본문도 없는 머리 두 줄만 나온다 — 에러 없이, 0건처럼 보이면서.
+    payload = payload.get("AdmRulService") or payload
+    기본 = 원천.행들(payload.get("행정규칙기본정보"))
+    기본 = 기본[0] if 기본 else {}
     머리 = [
         f"{기본.get('행정규칙명', '?')} ({기본.get('행정규칙종류', '-')})",
         f"소관 {기본.get('소관부처명', '-')} · 발령 {정규화.날짜(기본.get('발령일자')) or '-'}"
