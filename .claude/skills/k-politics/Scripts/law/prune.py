@@ -181,10 +181,15 @@ def 정리한다(conn, 종류: str, 테이블: str, 키컬럼: str, 목록,
         r[0] for r in conn.execute(
             f"SELECT {키컬럼} FROM {테이블} WHERE {키컬럼} NOT IN (SELECT 키 FROM _살아있는)")
     }
+    # ⚠️ **본문이 없는 원장만 고른다.** 옛 판본 본문과 새 판본 '재시도' 가 공존할 수 있고,
+    #    그 키를 여기 넣으면 방금 `누락기록` 이 '목록누락' 으로 바꾼 행을 곧바로 지운다 —
+    #    하루를 유예한다는 설계가 통째로 사라지고 적재 등식의 좌변만 줄어든다.
     떠난원장 = {
         r[0] for r in conn.execute(
-            "SELECT 자료ID FROM 수집실패 WHERE 자료종류=? AND 실패종류 IN (?,?,?,'재시도')"
-            " AND 자료ID NOT IN (SELECT 키 FROM _살아있는)", (종류, *본문없는실패))
+            f"SELECT f.자료ID FROM 수집실패 f WHERE f.자료종류=? AND f.실패종류 IN (?,?,?,'재시도')"
+            " AND f.자료ID NOT IN (SELECT 키 FROM _살아있는)"
+            f" AND NOT EXISTS (SELECT 1 FROM {테이블} t WHERE t.{키컬럼} = f.자료ID)",
+            (종류, *본문없는실패))
     }
 
     if not 검증된목록:

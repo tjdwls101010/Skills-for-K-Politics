@@ -171,20 +171,21 @@ CREATE INDEX IF NOT EXISTS idx_인용_자료   ON 인용판례(자료종류, 자
 CREATE TABLE IF NOT EXISTS 수집상태 (
   -- 자료종류·단계별 마지막 수집 상태 하나가 한 행이다. 실행 이력이 아니라 지금 상태다.
   -- ⚠ 정리 단계가 '건너뜀'이면 원천에서 사라진 자료가 아직 남아 있을 수 있다. `신선도`의 경고가 이를 문장으로 말한다.
-  자료종류     TEXT NOT NULL,  -- 법령·판례·헌재결정례·법령해석례, 그리고 실행 전체에 대한 행의 '전체'다.
-  단계         TEXT NOT NULL CHECK (단계 IN ('목록','정리','수집','감사')),  -- 수집·감사는 자료종류 '전체'의 행이다.
+  자료종류     TEXT NOT NULL CHECK (자료종류 IN ('법령','판례','헌재결정례','법령해석례','전체')),  -- '전체'는 실행 자체에 대한 행이다.
+  단계         TEXT NOT NULL CHECK (단계 IN ('목록','정리','수집','감사')),
   상태         TEXT NOT NULL CHECK (상태 IN ('완료','부분','이상','건너뜀','기준선없음')),
   건수         INTEGER,  -- 목록은 받은 건수, 정리는 지운 건수, 감사는 위반 게이트 수다.
-  기준선       INTEGER,  -- 목록 단계에서 마지막으로 완결 수신하고 급감이 아니었던 건수다. 부분 수신·급감은 이 값을 덮지 않는다.
+  기준선       INTEGER,  -- 목록 단계에서 마지막으로 완결 수신하고 급감이 아니었던 건수다.
   상세         TEXT,  -- 감사는 위반 게이트의 이름과 건수, 그 밖은 사유다.
   갱신일시     TEXT NOT NULL,
-  상태시작일시 TEXT NOT NULL,  -- 같은 상태가 이어지면 보존되는 시작 시각이다. 갱신일시와 벌어져 있으면 그만큼 이 상태가 지속됐다.
-  PRIMARY KEY (자료종류, 단계)
+  상태시작일시 TEXT NOT NULL,  -- 같은 상태가 이어지면 보존되는 시작 시각이다.
+  PRIMARY KEY (자료종류, 단계),
+  CHECK ((단계 IN ('수집','감사')) = (자료종류 = '전체'))
 );
 
 CREATE TABLE IF NOT EXISTS 수집실패 (
   -- 원천과 이 DB가 어긋난 자료 하나가 한 행이다. 여기 없다고 세상에 없는 것이 아니라는 경계를 말한다.
-  -- 실패종류의 뜻은 CHECK 순서대로다. 다음 실행이 다시 받는 오류 · 목록에는 있으나 본문이 원천에 없음 · 본문이 비어 담지 않음 · 담겨 있으나 목록에서 사라져 정리 대기 · 담았다가 원천이 거둬들여 지움.
+  -- 재시도=다음 실행이 다시 받는 오류 · 없음=목록에는 있으나 본문이 원천에 없음 · 본문없음=본문이 비어 담지 않음 · 목록누락=담겨 있으나 목록에서 사라져 정리 대기 · 철회=담았다가 원천이 거둬들여 지움.
   자료종류   TEXT NOT NULL,
   자료ID     TEXT NOT NULL,  -- 담기는 표의 키다. 법령은 법령ID이고 어느 판본이 실패했는지는 메시지에 있다.
   실패종류   TEXT NOT NULL CHECK (실패종류 IN ('재시도','없음','본문없음','목록누락','철회')),
@@ -230,14 +231,16 @@ CREATE VIEW 조문판단 AS
 DROP VIEW IF EXISTS 조문판단수;
 CREATE VIEW 조문판단수 AS
   -- 현행 조 하나가 한 행이며 그 조를 다룬 판단을 자료종류별로 센다. 0은 판단 부재가 아니라 매칭 부재다.
-  -- 수는 `조문판단`의 목록 길이와 같다. 둘 다 (자료종류, 자료ID)로 접으므로 쟁점·항호목 중복이 양쪽에서 같이 사라진다.
-  -- ⚠ 판단 표에 없는 자료ID를 가리키는 `의율조문` 행이 있으면 여기서만 세어진다. 그 고아는 감사가 0으로 지킨다.
+  -- 수는 `조문판단`의 목록 길이와 언제나 같다. 양쪽이 같은 판단 표에 실제로 있는 것만 세고 (자료종류, 자료ID)로 접는다.
   SELECT c.법령ID, l.법령명, c.조, c.가지, c.제목, c.순서,
          COUNT(DISTINCT CASE WHEN y.자료종류='판례'       THEN y.자료ID END) AS 판례수,
          COUNT(DISTINCT CASE WHEN y.자료종류='헌재결정례' THEN y.자료ID END) AS 헌재수,
          COUNT(DISTINCT CASE WHEN y.자료종류='법령해석례' THEN y.자료ID END) AS 해석수
     FROM 조문 c JOIN 법령 l USING (법령ID)
     LEFT JOIN 의율조문 y ON y.법령ID = c.법령ID AND y.조 = c.조 AND y.가지 = c.가지 AND y.부칙여부 = 0
+     AND (EXISTS (SELECT 1 FROM 판례 p       WHERE y.자료종류='판례'       AND p.판례ID       = y.자료ID)
+       OR EXISTS (SELECT 1 FROM 헌재결정례 d WHERE y.자료종류='헌재결정례' AND d.헌재결정례ID = y.자료ID)
+       OR EXISTS (SELECT 1 FROM 법령해석례 h WHERE y.자료종류='법령해석례' AND h.법령해석례ID = y.자료ID))
    GROUP BY c.법령ID, c.순서;
 
 DROP VIEW IF EXISTS 신선도;

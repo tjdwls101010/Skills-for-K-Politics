@@ -138,7 +138,23 @@ class Test스키마가_갈린_세대와는_견주지_않는다:
         _, 보, _ = 감사.run(conn)
         값 = str(next(v for 번호, _, v in 보 if 번호 == "R24"))
         assert "스키마가 다른 코퍼스다" in 값 and "옛날표" in 값
-        assert "다음 백업 세대부터" in 값, "언제 되살아나는지가 없으면 사람이 손댈지 모른다"
+        assert "감사를 통과한" in 값, "언제 되살아나는지가 없으면 사람이 손댈지 모른다"
+
+    def test_면제해도_줄어든_것은_보고값에_남는다(self, conn, db_path, 백업마당):
+        """⚠️ **판정에서 빼는 것과 눈에서 없애는 것은 다르다.** 그 창 안에서 진짜
+        대참사가 나면 게이트는 초록인데 아무 흔적이 없다 — 관측은 남아야 한다."""
+        _채운다(conn)
+        conn.execute("CREATE TABLE 옛날표 (x TEXT)")
+        conn.execute("INSERT INTO 옛날표 VALUES ('a')")
+        conn.commit()
+        백업마당()
+        conn.execute("DROP TABLE 옛날표")
+        conn.execute("DELETE FROM 판례")          # 비교 가능한 표가 통째로 사라졌다
+        conn.commit()
+        _, 보, _ = 감사.run(conn)
+        값 = str(next(v for 번호, _, v in 보 if 번호 == "R24"))
+        assert _게이트(conn, "A27") == 0, "면제 창인데 게이트가 빨갛다"
+        assert "그래도 줄어든 것" in 값 and "판례" in 값, 값
 
     def test_기준선_없음과_다른_얼굴이다(self, conn, db_path, 백업마당):
         """둘 다 "안 견줬다"지만 원인이 다르다 — 앞은 백업이 멈춘 것이고 뒤는 재설계다.

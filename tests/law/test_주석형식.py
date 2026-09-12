@@ -13,7 +13,7 @@ from pathlib import Path
 
 from law import schema as 스키마
 
-A0_스키마문자수 = 20750   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
+A0_스키마문자수 = 20887   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트
 
 
 def _주석줄들():
@@ -56,6 +56,13 @@ def test_뷰마다_머리_주석이_있다():
 
 
 def test_스키마_문자수가_기준선을_넘지_않는다(conn):
+    """이 DB 는 `.schema` 가 매 세션 읽히는 지면이라 **문자수가 곧 비용**이다.
+
+    ⚠️ **이 수를 올리는 것은 결정이지 형식이 아니다.** 산문이 불어난 것이면 그 산문을
+    줄여야 하고, 반대로 산문을 CHECK 로 옮기면 저장 DDL 은 오히려 늘 수 있다 — 그건
+    독자가 읽고 기억해야 하던 것이 값이 들어올 때 저절로 막히는 것으로 바뀐 것이라
+    올려도 된다. 이 검사는 둘을 구별하지 못하므로 **올린 사람이 어느 쪽인지 적는다.**
+    """
     stored = "\n".join(r[0] + ";" for r in conn.execute(
         "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY rowid"))
     assert len(stored.encode("utf-8")) <= A0_스키마문자수, len(stored.encode("utf-8"))
