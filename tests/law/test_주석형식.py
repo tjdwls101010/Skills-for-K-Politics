@@ -13,7 +13,7 @@ from pathlib import Path
 
 from law import schema as 스키마
 
-A0_스키마문자수 = 20411   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
+A0_스키마문자수 = 20750   # 2026-09-12 기준선: 빈 DB 의 `sqlite_master` 바이트 — 지시가 인터페이스로 가면 주석은 줄어야 한다
 
 
 def _주석줄들():

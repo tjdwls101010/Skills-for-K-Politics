@@ -105,6 +105,50 @@ class Test직전정상과_비교한다:
         assert "기준선 없음" in str(next(v for 번호, _, v in 보 if 번호 == "R24"))
 
 
+class Test스키마가_갈린_세대와는_견주지_않는다:
+    """⚠️ **표를 지우는 재설계를 하면 옛 세대의 `행수` 는 다른 코퍼스의 수가 된다.**
+    같은 이름으로 남은 표도 담는 정책이 바뀌어(판본 전부 → 현행 하나) 그 감소가 사고인지
+    설계인지 이 축은 구별할 수 없다.
+
+    그런데 새 세대는 이 게이트가 빨개서 감사통과로 못 올라간다 — 견주기를 강행하면
+    **영원히 빨간 채로 굳고, 고칠 수 없는 빨간불은 표 전체를 무시하게 만든다.**
+    """
+
+    def test_그_세대에만_있는_표가_있으면_견주지_않는다(self, conn, db_path, 백업마당):
+        _채운다(conn)
+        conn.execute("CREATE TABLE 옛날표 (x TEXT)")
+        conn.execute("INSERT INTO 옛날표 VALUES ('a')")
+        conn.commit()
+        백업마당()
+        conn.execute("DROP TABLE 옛날표")          # 재설계가 표를 지웠다
+        conn.execute("DELETE FROM 판례")            # 그리고 핵심표가 통째로 줄었다
+        conn.commit()
+        assert _게이트(conn, "A27") == 0, "스키마가 갈린 세대와 견줘 빨개졌다"
+
+    def test_왜_안_견줬는지가_보고값에_있다(self, conn, db_path, 백업마당):
+        """⚠️ **축이 꺼진 것을 조용히 초록으로 내면 안 된다.** 사람이 할 일은 없지만
+        그동안 이 축이 아무것도 안 지킨다는 사실은 보여야 한다."""
+        _채운다(conn)
+        conn.execute("CREATE TABLE 옛날표 (x TEXT)")
+        conn.execute("INSERT INTO 옛날표 VALUES ('a')")
+        conn.commit()
+        백업마당()
+        conn.execute("DROP TABLE 옛날표")
+        conn.commit()
+        _, 보, _ = 감사.run(conn)
+        값 = str(next(v for 번호, _, v in 보 if 번호 == "R24"))
+        assert "스키마가 다른 코퍼스다" in 값 and "옛날표" in 값
+        assert "다음 백업 세대부터" in 값, "언제 되살아나는지가 없으면 사람이 손댈지 모른다"
+
+    def test_기준선_없음과_다른_얼굴이다(self, conn, db_path, 백업마당):
+        """둘 다 "안 견줬다"지만 원인이 다르다 — 앞은 백업이 멈춘 것이고 뒤는 재설계다.
+        같은 문장으로 내면 백업이 멈춘 날을 재설계로 읽는다."""
+        _채운다(conn)
+        conn.commit()
+        _, 보, _ = 감사.run(conn)
+        assert "기준선 없음" in str(next(v for 번호, _, v in 보 if 번호 == "R24"))
+
+
 class Test원장이_줄어든_것은_사고가_아니다:
     """⚠️ **원장은 일이 끝나면 줄어드는 표다.** 그것을 급감으로 세면 **가장 잘 돌아간
     날이 가장 빨갛다** — 실측으로 `수집실패 507→1` 이 A27 을 빨갛게 만들었고, 정작

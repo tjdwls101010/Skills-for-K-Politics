@@ -229,13 +229,15 @@ CREATE VIEW 조문판단 AS
 
 DROP VIEW IF EXISTS 조문판단수;
 CREATE VIEW 조문판단수 AS
-  -- 현행 조 하나가 한 행이며 `조문판단`에 있는 판단을 자료종류별로 센다. 0은 판단 부재가 아니라 매칭 부재다.
+  -- 현행 조 하나가 한 행이며 그 조를 다룬 판단을 자료종류별로 센다. 0은 판단 부재가 아니라 매칭 부재다.
+  -- 수는 `조문판단`의 목록 길이와 같다. 둘 다 (자료종류, 자료ID)로 접으므로 쟁점·항호목 중복이 양쪽에서 같이 사라진다.
+  -- ⚠ 판단 표에 없는 자료ID를 가리키는 `의율조문` 행이 있으면 여기서만 세어진다. 그 고아는 감사가 0으로 지킨다.
   SELECT c.법령ID, l.법령명, c.조, c.가지, c.제목, c.순서,
          COUNT(DISTINCT CASE WHEN y.자료종류='판례'       THEN y.자료ID END) AS 판례수,
          COUNT(DISTINCT CASE WHEN y.자료종류='헌재결정례' THEN y.자료ID END) AS 헌재수,
          COUNT(DISTINCT CASE WHEN y.자료종류='법령해석례' THEN y.자료ID END) AS 해석수
     FROM 조문 c JOIN 법령 l USING (법령ID)
-    LEFT JOIN 조문판단 y ON y.법령ID = c.법령ID AND y.조 = c.조 AND y.가지 = c.가지
+    LEFT JOIN 의율조문 y ON y.법령ID = c.법령ID AND y.조 = c.조 AND y.가지 = c.가지 AND y.부칙여부 = 0
    GROUP BY c.법령ID, c.순서;
 
 DROP VIEW IF EXISTS 신선도;

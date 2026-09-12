@@ -75,20 +75,37 @@ def _백업모듈():
     return m
 
 
+# 기준선 세대가 지금 DB 에 없는 표를 기록하고 있을 때 그 사실을 실어 나르는 표지.
+# **`None`(세대 없음)과 다른 사건이다** — 견줄 세대는 있는데 견줄 수 없는 것이다.
+_스키마가갈림 = "스키마가갈림"
+
+
 def _직전정상(conn) -> tuple[str | None, list]:
-    """`(견준 세대 이름 | None, 급감한 표들)`. 세대가 없으면 `(None, [])`."""
+    """`(견준 세대 이름 | None, 급감한 표들)`. 세대가 없으면 `(None, [])`.
+
+    ⚠️ **스키마가 갈린 세대와는 견주지 않는다.** 표를 지우는 재설계를 하면 옛 세대의
+    `행수` 는 **다른 코퍼스의 수**가 된다 — 같은 이름으로 남은 표도 담는 정책이 바뀌어
+    (판본 전부 → 현행 하나, 위임 전부 → 시행령·시행규칙) 그 감소가 사고인지 설계인지
+    이 축은 구별할 수 없다. 그런데 새 세대는 이 게이트가 빨개서 감사통과로 못 올라가므로,
+    견주기를 강행하면 **영원히 빨간 채로 굳는다 — 그리고 고칠 수 없는 빨간불은 표 전체를
+    무시하게 만든다.**
+
+    판정 근거는 **지금 DB 에 없는 표를 그 세대가 기록하고 있는가** 하나다. 재설계 다음
+    세대부터는 표 집합이 같아져 축이 저절로 되살아난다 — 사람이 끌 것이 없다.
+    """
     if (있는것 := _직전캐시.get(id(conn))) is not None:
         return 있는것
     답: tuple[str | None, list] = (None, [])
     if (백업 := _백업모듈()) and (기준 := 백업.기준선(_코퍼스이름)):
         이름, 전 = 기준
-        지금 = {}
+        지금, 사라진 = {}, []
         for t in 전:
             try:
                 지금[t] = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
             except sqlite3.OperationalError:
-                continue      # 표가 없다 — A0 가 진다
-        답 = (이름, 백업.급감표(_코퍼스이름, 전, 지금))
+                사라진.append(t)      # 표가 없다 — 갈린 것이거나 A0 가 진다
+        답 = ((_스키마가갈림, 이름, 사라진), []) if 사라진 else (
+            이름, 백업.급감표(_코퍼스이름, 전, 지금))
     _직전캐시[id(conn)] = 답
     return 답
 
@@ -105,6 +122,14 @@ def _급감상세(conn) -> str:
         # ⚠️ **"기준선 없음" 과 "견줘 봤는데 0" 을 같은 얼굴로 내면 안 된다.** 백업이
         #    멈춘 날 이 축이 조용히 아무것도 안 지키는데 게이트는 초록이다.
         return "기준선 없음 — 검증된 백업 세대가 아직 없다"
+    if isinstance(이름, tuple):
+        # ⚠️ **세 번째 얼굴이다.** 세대는 있는데 그 세대가 다른 스키마의 코퍼스라
+        #    견줄 수 없다. 다음 세대부터 저절로 되살아나므로 사람이 할 일은 없지만,
+        #    **그동안 이 축이 아무것도 안 지킨다는 사실**은 보여야 한다.
+        _, 세대, 사라진 = 이름
+        return (f"{세대} 는 스키마가 다른 코퍼스다 — 견주지 않았다"
+                f" (그 세대에만 있는 표: {' · '.join(sorted(사라진))})."
+                " 이 축은 다음 백업 세대부터 되살아난다")
     if not 난것:
         return f"{이름} 대비 급감 없음"
     return f"{이름} 대비 " + " · ".join(
@@ -130,10 +155,10 @@ def _뷰이름들(schema: str) -> list[str]:
 # ⚠️ `신선도` 는 여기 없다 — 빈 DB 에서도 값이 NULL 인 한 행이라 비는 일이 구조적으로 없다.
 #    비었으면 그것은 진짜 결함이다.
 비어도되는뷰: dict[str, tuple[str, str]] = {
-    "위임대상조문": ("위임 관계를 아직 하나도 안 받았다", "SELECT COUNT(*) FROM 위임"),
+    "위임대상조문": ("위임 관계를 아직 하나도 안 받았다", "SELECT 1 FROM 위임 LIMIT 1"),
     "조문판단": ("참조에서 현행 조 좌표를 하나도 못 풀었다",
-              "SELECT COUNT(*) FROM 의율조문 WHERE 법령ID IS NOT NULL AND 조 IS NOT NULL"),
-    "조문판단수": ("조문을 아직 하나도 안 받았다", "SELECT COUNT(*) FROM 조문"),
+              "SELECT 1 FROM 의율조문 WHERE 법령ID IS NOT NULL AND 조 IS NOT NULL LIMIT 1"),
+    "조문판단수": ("조문을 아직 하나도 안 받았다", "SELECT 1 FROM 조문 LIMIT 1"),
 }
 
 
@@ -150,14 +175,17 @@ def _깨진뷰상세(conn) -> tuple[int, list[str]]:
     난것 = []
     for v in 이름들:
         try:
-            빈가 = conn.execute(f'SELECT COUNT(*) FROM "{v}"').fetchone()[0] == 0
+            # ⚠️ **`COUNT(*)` 로 묻지 마라.** 이 게이트가 묻는 것은 "비었나"인데 COUNT 는
+            #    뷰 전체를 만들어 낸다 — 집계 뷰에서 그 차이가 0.00초 대 수십 초다.
+            #    `LIMIT 1` 은 첫 행에서 멈춘다.
+            빈가 = conn.execute(f'SELECT 1 FROM "{v}" LIMIT 1').fetchone() is None
         except sqlite3.Error as e:
             난것.append(f"{v}({e})")
             continue
         if not 빈가:
             continue
-        사유, 입력 = 비어도되는뷰.get(v, (None, None))
-        if 입력 and conn.execute(입력).fetchone()[0] == 0:
+        _, 입력 = 비어도되는뷰.get(v, (None, None))
+        if 입력 and conn.execute(입력).fetchone() is None:
             continue          # 입력이 비어서 빈 것이다 — 뷰의 결함이 아니다
         난것.append(f"{v}(비었다)")
     return len(이름들), 난것
