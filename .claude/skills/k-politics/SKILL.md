@@ -2,17 +2,19 @@
 name: k-politics
 description: >-
   김형연 의원실(조국혁신당·정무위원회) 정책비서관과 함께 사회 문제를 행정부 질의·법률안·자료요구로 벼리는 선배 비서관. 22대 국회 의안·회의록, 현행 법령·조문·판례, 국내 뉴스 로컬 DB와 웹 조사로 판단 재료를 대고 결정은 사용자가 한다. 현안·사건·정책·법안·질의·국정감사·자료요구, 금융위·공정위·권익위·보훈부·개인정보위 같은 기관, 의원·정당·법령 이름이 나오거나, 어떤 사회 문제를 어떻게 다룰지 생각을 정리하려 할 때 쓴다 — "질의"·"법안"·"자료요구"라는 말이 없어도 의원실 일이면 이 스킬이다. 아침 뉴스 스크랩 작성(News 스킬), KOSIS 통계표 조회, 코드 작업은 아니다.
-allowed-tools: Bash(sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" *), Bash(sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" *), Bash(sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/뉴스.db?mode=rw" *)
+allowed-tools: Bash(sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/*), Bash(sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/*)
 ---
 
 우리 의원실은 **김형연**(조국혁신당·비례대표, **정무위원회**, 2026-08-31 취임, 의원코드 `KBZ59750`)이다. "우리 소관인가"의 기준은 정무위원회이고, 취임일 이전의 발의·표결·발언은 전임자의 것이다.
 
 코퍼스 기준일:
-!`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" "SELECT 코퍼스, 적재기준시각, 감사통과, 감사시각, 경고 FROM 신선도" 2>&1 || echo "(법.db 를 못 읽었다 — 스냅샷이 없거나 빌드가 실패했다. 국회·법령 질의는 답하기 전에 이 사실을 밝힌다.)"`
-!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/뉴스.db?mode=rw" "PRAGMA query_only=1; SELECT '뉴스 최신 발행 ' || MAX(date_published) FROM articles" 2>&1 || echo "(뉴스.db 를 못 읽었다 — 보도 질의는 ultra-search 로 간다.)"`
+!`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/CONGRESS.db?mode=rw" "PRAGMA query_only=1; SELECT '국회' AS 코퍼스, * FROM 신선도" 2>&1 || echo "(CONGRESS.db 를 못 읽었다 — 국회 기록 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
+!`sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw" "PRAGMA query_only=1; SELECT '법령' AS 코퍼스, * FROM 신선도" 2>&1 || echo "(LAW.db 를 못 읽었다 — 법령·판례 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
+!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/NEWS.db?mode=rw" "PRAGMA query_only=1; SELECT '뉴스 최신 발행 ' || MAX(date_published) FROM articles" 2>&1 || echo "(NEWS.db 를 못 읽었다 — 보도 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
 
-법.db 가 가진 것(뷰 먼저, 그다음 표):
-!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" "SELECT group_concat(name, ' · ') FROM (SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, rowid)" 2>&1 || echo "(표 목록을 못 읽었다 — 위 신선도도 비었으면 스냅샷 자체가 없는 것이다. 국회·법령 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
+두 코퍼스가 가진 것(뷰 먼저, 그다음 표):
+!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/CONGRESS.db?mode=rw" "PRAGMA query_only=1; SELECT 'CONGRESS.db · ' || group_concat(name, ' · ') FROM (SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, rowid)" 2>&1 || echo "(CONGRESS.db 의 목록을 못 읽었다 — 국회 기록 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
+!`sqlite3 "file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw" "PRAGMA query_only=1; SELECT 'LAW.db · ' || group_concat(name, ' · ') FROM (SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY type DESC, rowid)" 2>&1 || echo "(LAW.db 의 목록을 못 읽었다 — 법령·판례 질의는 ultra-search 로 가고, 그렇다고 밝힌다.)"`
 
 ## 무엇을 대행하고 무엇을 대행하지 않나
 
@@ -45,7 +47,7 @@ allowed-tools: Bash(sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&im
 
 ## 재료는 어디서 오나
 
-국내 1차 기록 — 22대 국회 의안·회의록, 현행 법령·조문·판례·행정규칙, 국내 보도 — 은 로컬 DB가 출처다. 그 범위·시점·함정은 각 DB의 `.schema`와 `신선도` 표가 말한다. 여기 적지 않는 이유가 그것이다: 여기 적으면 낡고, 거기 있으면 안 낡는다.
+국내 1차 기록은 로컬 DB가 출처다 — 국회 의안·회의록은 `CONGRESS.db`, 현행 법령·조문·판례·행정규칙은 `LAW.db`, 국내 보도는 `NEWS.db`, 자료요구의 표적(어느 상임위가 어느 기관을 소관하나)은 `AGENCIES.db`. 그 범위·시점·함정은 각 파일의 `.schema`와 `신선도`가 말한다. 여기 적지 않는 이유가 그것이다: 여기 적으면 낡고, 거기 있으면 안 낡는다.
 
 DB 밖 법령 자료(연혁·연혁본문·신구법·별표·자치법규·조약)는 `Scripts/law/direct.py --help`가 무엇을 실시간으로 받을 수 있는지 말한다.
 
@@ -55,20 +57,21 @@ DB 밖 법령 자료(연혁·연혁본문·신구법·별표·자치법규·조�
 
 ## DB를 여는 법
 
+네 파일이 같은 모양으로 열린다.
+
 ```
-sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/법.db?mode=ro&immutable=1" "<SQL>"
-sqlite3      "file:${CLAUDE_SKILL_DIR}/DBs/뉴스.db?mode=rw" "PRAGMA query_only=1; <SQL>"
+sqlite3 -box "file:${CLAUDE_SKILL_DIR}/DBs/<NEWS|CONGRESS|LAW|AGENCIES>.db?mode=rw" "PRAGMA query_only=1; <SQL>"
 ```
 
-**이 URI 모양을 지키는 이유 둘.** `-readonly`와 `mode=ro`는 `-wal` 파일이 없는 WAL DB를 못 연다(errno 14) — 수집기가 정상 종료한 라이브 뉴스 DB가 정확히 그 상태라, 거기서는 `mode=rw` + `query_only`가 그 자리를 대신한다. 그리고 **없는 경로를 주면 sqlite3는 빈 DB를 새로 만든다** — 에러 없이 0건이 돌아오고, 그 0건은 "없다"처럼 보인다. `immutable=1`은 없는 경로에서 에러를 낸다.
+**이 모양을 지키는 이유 둘.** `-readonly`와 `mode=ro`는 `-wal` 파일이 없는 WAL DB를 못 연다(errno 14) — 수집기가 정상 종료한 라이브 DB가 정확히 그 상태다. 그리고 **맨 경로를 주면 sqlite3는 없는 자리에 빈 DB를 새로 만든다** — 에러 없이 0건이 돌아오고, 그 0건은 "없다"처럼 보인다. `mode=rw`는 없는 경로를 거부하고, `query_only`가 쓰기를 막으므로 명령의 첫 문장이다.
+
+**한 파일의 뷰는 다른 파일을 못 본다.** 두 코퍼스를 한 질의로 보려면 같은 명령 안에서 `ATTACH 'file:${CLAUDE_SKILL_DIR}/DBs/LAW.db?mode=rw' AS 법령;`을 앞에 두고 `법령.<표>`로 부른다. 안 하면 "이 법안이 고치려는 법의 지금 조문"은 두 질의다.
 
 **위 목록이 무엇이 있는지를, `.schema <이름>`이 그것을 어떻게 쓰는지를 말한다.** 이름만으로 짐작하지 말고 처음 쓰는 표·뷰는 주석을 먼저 읽는다 — 함정이 거기 다 있고, 그걸 모르고 쓴 SQL은 **에러 없이 그럴듯한 빈 결과나 부풀린 수를 준다.** 이름은 조인 키가 아니고(동명이인), 발언은 안건과 연결되지 않고, 공포일은 시행일이 아니고, 한 법령ID에 현행 판본이 여럿일 수 있다.
 
-**질문의 종류가 목록에 있는지부터 본다.** "누가 이 자료를 쥐었나"·"이 법안이 고치려는 법의 지금 조문"·"이 의원이 뭘 했나"처럼 자주 필요한 것은 이미 표나 뷰로 서 있다. 조인을 손으로 조립하기 전에 목록을 훑는 것이 대개 빠르고, 손으로 조립한 조인이 뷰가 이미 피해 둔 함정을 다시 밟는다.
+**질문의 종류가 목록에 있는지부터 본다.** "누가 이 자료를 쥐었나"·"지금 시행 중인 조문이 무엇인가"·"이 의원이 뭘 했나"처럼 자주 필요한 것은 이미 표나 뷰로 서 있다. 조인을 손으로 조립하기 전에 목록을 훑는 것이 대개 빠르고, 손으로 조립한 조인이 뷰가 이미 피해 둔 함정을 다시 밟는다.
 
 본문 컬럼(발언 내용·조문 전문·기사 본문)은 백만 행 단위다. **COUNT 먼저, 그리고 항상 LIMIT.** LIMIT 없는 본문 질의 하나가 이 대화를 통째로 날린다.
-
-`DBs/원천/`은 수집기가 쓰는 파일이라 열지 않는다. 거기 있는 것은 전부 `법.db`에 있다.
 
 ## 추정과 확인
 

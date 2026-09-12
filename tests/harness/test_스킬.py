@@ -57,14 +57,15 @@ class Test프론트매터:
         0 아닌 종료 코드는 에러 한 줄이 아니라 **스킬 호출 전체를 중단**시킨다 — 클로드가
         본문을 통째로 못 받는다(2026-09-12 문서 확인). 계획의 D13("allowed-tools 없음")이
         이 실측으로 뒤집힌 자리다."""
+        import fnmatch
+
         yaml = pytest.importorskip("yaml")
-        허용 = yaml.safe_load(프론트매터)["allowed-tools"]
+        규칙 = [m.group(1) for m in re.finditer(r"Bash\((.+?)\)(?:,|$)",
+                                              yaml.safe_load(프론트매터)["allowed-tools"])]
+        assert 규칙
         for 주입 in re.findall(r"^!`(.+?)`$", 본문, re.M):
-            앞 = 주입.split('"')[0].strip()      # 'sqlite3 -box' 또는 'sqlite3'
-            db = re.search(r"DBs/([^?]+)\?([^\"]*)", 주입)
-            assert db, 주입
-            패턴 = f'{앞} "file:${{CLAUDE_SKILL_DIR}}/DBs/{db.group(1)}?{db.group(2)}"'
-            assert 패턴 in 허용, f"allow 규칙이 이 주입을 안 덮는다:\n  {패턴}"
+            assert any(fnmatch.fnmatchcase(주입, 하나 if 하나.endswith("*") else 하나 + "*")
+                       for 하나 in 규칙), f"allow 규칙이 이 주입을 안 덮는다:\n  {주입}"
 
 
 class Test주입명령:
@@ -83,9 +84,12 @@ class Test주입명령:
             폴백 = 명령.split("|| echo", 1)[1]
             assert len(폴백) > 30, f"폴백이 상태만 말하고 대안을 안 준다: {폴백}"
 
-    def test_신선도를_주입한다(self, 본문):
-        """본문에 날짜를 적으면 낡는다. 매일 바뀌는 것만 DB 에서 읽어 온다."""
-        assert "FROM 신선도" in 본문
+    def test_코퍼스마다_신선도를_주입한다(self, 본문):
+        """본문에 날짜를 적으면 낡는다. 매일 바뀌는 것만 DB 에서 읽어 온다.
+
+        파일이 곧 코퍼스라 신선도도 파일마다 하나다 — 하나만 읽으면 나머지 코퍼스의 시점을
+        모르는 채로 답하게 된다."""
+        assert 본문.count("FROM 신선도") == 2
 
 
 class TestDB경계:
@@ -95,17 +99,19 @@ class TestDB경계:
         명령들 = re.findall(r"sqlite3 [^\n]*", 본문)
         assert 명령들
         for 명령 in 명령들:
-            if "<SQL>" not in 명령 and "!`" not in f"!`{명령}":
-                pass
             assert "file:" in 명령, f"URI 가 아니다: {명령}"
-            assert ("mode=ro&immutable=1" in 명령
-                    or ("mode=rw" in 명령 and "query_only" in 본문)), f"안전하지 않다: {명령}"
+            assert "mode=rw" in 명령 and "query_only" in 본문, f"안전하지 않다: {명령}"
 
-    def test_원천을_열지_않는다(self, 본문):
-        """`DBs/원천/` 은 수집기가 쓰는 라이브 파일이다."""
-        for 명령 in re.findall(r"sqlite3 [^\n]*", 본문):
-            assert "원천/" not in 명령
-        assert "`DBs/원천/`은" in 본문, "열지 않는다는 것을 본문이 말해야 한다"
+    def test_네_파일을_이름으로_부른다(self, 본문):
+        """파일이 곧 코퍼스다 — 어느 파일에 무엇이 있는지는 이름과 3절 한 문장이 진다."""
+        for 파일 in ("NEWS.db", "CONGRESS.db", "LAW.db", "AGENCIES.db"):
+            assert 파일 in 본문, 파일
+
+    def test_사라진_층의_이름이_남아_있지_않다(self, 본문):
+        """`법.db` 도 `DBs/원천/` 도 없다. `immutable=1` 은 라이브 DB 에서 최근 커밋이 빠진
+        것을 읽게 하므로 이 레시피에 없다."""
+        for 말 in ("법.db", "원천/", "immutable"):
+            assert 말 not in 본문, 말
 
     def test_행_수_상한을_원리로_막는다(self, 본문):
         """래퍼가 없어 LIMIT 이 강제되지 않는다. 막는 것은 이 문장뿐이다."""
