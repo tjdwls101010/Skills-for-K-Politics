@@ -1,0 +1,322 @@
+{
+  "ALLBILL 의안ID": {
+    "항상": [
+      "BILL_ID",
+      "BILL_KND",
+      "BILL_NM",
+      "BILL_NO",
+      "ERACO",
+      "GVRN_TRSF_DT",
+      "JRCMIT_CMMT_DT",
+      "JRCMIT_NM",
+      "JRCMIT_PROC_DT",
+      "JRCMIT_PROC_RSLT",
+      "JRCMIT_PRSNT_DT",
+      "LAW_CMMT_DT",
+      "LAW_PROC_DT",
+      "LAW_PROC_RSLT",
+      "LAW_PRSNT_DT",
+      "LINK_URL",
+      "PPSL_DT",
+      "PPSL_SESS",
+      "PPSR_KND",
+      "PPSR_NM",
+      "PROM_DT",
+      "PROM_LAW_NM",
+      "PROM_NO",
+      "RGS_CONF_NM",
+      "RGS_CONF_RSLT",
+      "RGS_PRSNT_DT",
+      "RGS_RSLN_DT"
+    ],
+    "가끔": []
+  },
+  "ALLNAMEMBER 의원전체": {
+    "항상": [
+      "AIDE_NM",
+      "BIRDY_DIV_CD",
+      "BIRDY_DT",
+      "BLNG_CMIT_NM",
+      "BRF_HST",
+      "CHF_SCRT_NM",
+      "CMIT_NM",
+      "DTY_NM",
+      "ELECD_DIV_NM",
+      "ELECD_NM",
+      "GTELT_ERACO",
+      "NAAS_CD",
+      "NAAS_CH_NM",
+      "NAAS_EMAIL_ADDR",
+      "NAAS_EN_NM",
+      "NAAS_HP_URL",
+      "NAAS_NM",
+      "NAAS_PIC",
+      "NAAS_TEL_NO",
+      "NTR_DIV",
+      "OFFM_RNUM_NO",
+      "PLPT_NM",
+      "RLCT_DIV_NM",
+      "SCRT_NM"
+    ],
+    "가끔": []
+  },
+  "BILLINFOPPSR 제안자": {
+    "항상": [
+      "BILL_ID",
+      "BILL_NM",
+      "BILL_NO",
+      "ERACO",
+      "NASS_CD",
+      "PPSL_DT",
+      "PPSR_CH_NM",
+      "PPSR_CN",
+      "PPSR_KIND",
+      "PPSR_NM",
+      "PPSR_POLY_NM",
+      "PPSR_ROLE",
+      "REP_DIV"
+    ],
+    "가끔": []
+  },
+  "BPMBILLSUMMARY 요약": {
+    "항상": [],
+    "가끔": [
+      "AGE",
+      "BILL_ID",
+      "BILL_NAME",
+      "BILL_NO",
+      "SUMMARY"
+    ]
+  },
+  "TVBPMBILL11 의안목록": {
+    "항상": [
+      "AGE",
+      "BILL_ID",
+      "BILL_NAME",
+      "BILL_NO",
+      "CMT_PRESENT_DT",
+      "CMT_PROC_DT",
+      "CMT_PROC_RESULT_CD",
+      "COMMITTEE_DT",
+      "COMMITTEE_PROC_DT",
+      "CURR_COMMITTEE",
+      "CURR_COMMITTEE_ID",
+      "LAW_PRESENT_DT",
+      "LAW_PROC_DT",
+      "LAW_PROC_RESULT_CD",
+      "LAW_SUBMIT_DT",
+      "LINK_URL",
+      "PASS_GUBUN",
+      "PROC_DT",
+      "PROC_RESULT_CD",
+      "PROPOSER",
+      "PROPOSER_KIND",
+      "PROPOSE_DT",
+      "RST_MONA_CD",
+      "RST_PROPOSER"
+    ],
+    "가끔": []
+  },
+  "TVBPMCONFINFO 소위심사": {
+    "항상": [
+      "AGE",
+      "BILL_ID",
+      "BILL_NO",
+      "COMMITTEE_ID",
+      "COMMITTEE_NAME",
+      "CONF_BIGO",
+      "ENROLL_TYPE",
+      "PRESENT_CHA",
+      "PRESENT_DT",
+      "PRESENT_SESSION",
+      "PROC_CHA",
+      "PROC_DT",
+      "PROC_RESULT_CD",
+      "PROC_SESSION",
+      "SUBMIT_DT",
+      "SUB_COMMITTEE_NAME"
+    ],
+    "가끔": []
+  },
+  "VCONFAPIGCONFLIST 국정감사": {
+    "항상": [
+      "CMIT_CD",
+      "CMIT_NM",
+      "CONF_DT",
+      "CONF_ID",
+      "CONF_KND",
+      "DGR",
+      "DOWN_URL",
+      "ERACO",
+      "SESS"
+    ],
+    "가끔": []
+  },
+  "VCONFBILLLIST 회의의안": {
+    "항상": [
+      "BILL_ID",
+      "BILL_NM",
+      "CONF_ID",
+      "DGR",
+      "ERACO",
+      "LINK_URL",
+      "SESS"
+    ],
+    "가끔": []
+  },
+  "ncocpgfiaoituanbr 표결집계": {
+    "항상": [],
+    "가끔": [
+      "AGE",
+      "BILL_ID",
+      "BILL_KIND_CD",
+      "BILL_NAME",
+      "BILL_NO",
+      "BLANK_TCNT",
+      "CURR_COMMITTEE",
+      "CURR_COMMITTEE_ID",
+      "LINK_URL",
+      "MEMBER_TCNT",
+      "NO_TCNT",
+      "PROC_DT",
+      "PROC_RESULT_CD",
+      "VOTE_TCNT",
+      "YES_TCNT"
+    ]
+  },
+  "ncwgseseafwbuheph 회의": {
+    "항상": [
+      "CLASS_NAME",
+      "COMM_NAME",
+      "CONFER_NUM",
+      "CONF_DATE",
+      "CONF_ID",
+      "CONF_LINK_URL",
+      "DAE_NUM",
+      "DEPT_CD",
+      "PDF_FILE_ID",
+      "PDF_LINK_URL",
+      "SUB_NAME",
+      "TITLE",
+      "VODCOMM_CODE",
+      "VOD_LINK_URL"
+    ],
+    "가끔": []
+  },
+  "nkimylolanvseqagq 위원회": {
+    "항상": [
+      "CLASS_ID",
+      "CLASS_NM",
+      "CMIT_CD",
+      "CMIT_NM",
+      "SUB_CMIT_CD",
+      "SUB_CMIT_NM",
+      "TH"
+    ],
+    "가끔": []
+  },
+  "nktulghcadyhmiqxi 위원회위원": {
+    "항상": [
+      "ASSEM_EMAIL",
+      "ASSEM_TEL",
+      "DEPT_CD",
+      "DEPT_NM",
+      "HG_NM",
+      "HJ_NM",
+      "JOB_RES_NM",
+      "MONA_CD",
+      "ORIG_NM",
+      "POLY_NM",
+      "ROOM_NO",
+      "SECRETARY",
+      "SECRETARY2",
+      "STAFF"
+    ],
+    "가끔": []
+  },
+  "nojepdqqaweusdfbi 표결명단": {
+    "항상": [
+      "AGE",
+      "BILL_ID",
+      "BILL_NAME",
+      "BILL_NAME_URL",
+      "BILL_NO",
+      "BILL_URL",
+      "CURRENTS_CD",
+      "CURR_COMMITTEE",
+      "CURR_COMMITTEE_ID",
+      "DEPT_CD",
+      "DISP_ORDER",
+      "HG_NM",
+      "HJ_NM",
+      "LAW_TITLE",
+      "MEMBER_NO",
+      "MONA_CD",
+      "ORIG_CD",
+      "ORIG_NM",
+      "POLY_CD",
+      "POLY_NM",
+      "RESULT_VOTE_MOD",
+      "SESSION_CD",
+      "VOTE_DATE"
+    ],
+    "가끔": []
+  },
+  "nwvrqwxyaytdsfvhu 현직": {
+    "항상": [
+      "ASSEM_ADDR",
+      "BTH_DATE",
+      "BTH_GBN_NM",
+      "CMITS",
+      "CMIT_NM",
+      "ELECT_GBN_NM",
+      "ENG_NM",
+      "E_MAIL",
+      "HG_NM",
+      "HJ_NM",
+      "HOMEPAGE",
+      "JOB_RES_NM",
+      "MEM_TITLE",
+      "MONA_CD",
+      "ORIG_NM",
+      "POLY_NM",
+      "REELE_GBN_NM",
+      "SECRETARY",
+      "SECRETARY2",
+      "SEX_GBN_NM",
+      "STAFF",
+      "TEL_NO",
+      "UNITS"
+    ],
+    "가끔": []
+  },
+  "nzmimeepazxkubdpn 발의자": {
+    "항상": [
+      "AGE",
+      "BILL_ID",
+      "BILL_NAME",
+      "BILL_NO",
+      "CMT_PRESENT_DT",
+      "CMT_PROC_DT",
+      "CMT_PROC_RESULT_CD",
+      "COMMITTEE",
+      "COMMITTEE_DT",
+      "COMMITTEE_ID",
+      "DETAIL_LINK",
+      "LAW_PRESENT_DT",
+      "LAW_PROC_DT",
+      "LAW_PROC_RESULT_CD",
+      "LAW_SUBMIT_DT",
+      "MEMBER_LIST",
+      "PROC_DT",
+      "PROC_RESULT",
+      "PROPOSER",
+      "PROPOSE_DT",
+      "PUBL_MONA_CD",
+      "PUBL_PROPOSER",
+      "RST_MONA_CD",
+      "RST_PROPOSER"
+    ],
+    "가끔": []
+  }
+}
