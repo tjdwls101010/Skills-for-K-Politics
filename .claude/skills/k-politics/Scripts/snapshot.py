@@ -144,7 +144,7 @@ CREATE TABLE 신선도 (
   -- 사용자가 "지금 어떻게 되어 있나"를 물을 때 그 '지금'이 며칠 전인지 모르면 낡은 시점의 답을 오늘 것인 양 내놓게 된다. 그래서 시점을 묻는 질의는 여기 한 표에서 끝난다.
   코퍼스       TEXT PRIMARY KEY,  -- '국회' | '법령' | '소관기관'
   적재기준시각 TEXT,     -- 원천이 마지막으로 자료를 받은 시각(KST). NULL = 원천에 기록이 없다.
-  감사통과     INTEGER,  -- 1 = 마지막 감사가 게이트를 다 통과. 0 = 위반 있음(감사상세를 본다). NULL = 감사 기록 없음.
+  감사통과     INTEGER,  -- 1 = 마지막 감사가 게이트를 다 통과. NULL = 감사 기록 없음. **0 = 위반이 남아 있다** — 이 코퍼스를 근거로 답할 때는 `감사상세` 의 게이트가 무엇을 재는지 확인하거나, 못 하면 그 한계를 답에 밝힌다. 조용히 넘어가면 검증에 실패한 자료를 검증된 것처럼 내놓게 된다.
   감사상세     TEXT,     -- 위반한 게이트와 건수. NULL = 위반 없음 또는 기록 없음.
   경고         TEXT,     -- ⚠️ 이 코퍼스의 **어느 부분이 옛 값인가**를 문장으로. NULL = 그런 부분 없음.
   빌드시각     TEXT NOT NULL  -- 이 스냅샷 파일을 만든 시각(KST). 적재기준시각과 다르다 — 빌드는 매일 돌지만 원천 수집은 실패할 수 있어, 둘이 벌어져 있으면 그만큼 수집이 멈춰 있었다는 뜻이다.
@@ -176,9 +176,10 @@ CREATE TABLE 법률안대상법령 (
 CREATE INDEX idx_대상법령_법령 ON 법률안대상법령(법령ID);
 
 CREATE VIEW 법률안현행조문 AS
-  -- **이 법률안이 고치려는 법의 지금 조문** 하나가 한 행이다. 법안 원문이 아니라 현행이라, "무엇을 고치려는 법안인가"를 볼 때 조인을 매번 조립하지 않게 한다.
+  -- **이 법률안이 고치려는 법의 조문** 하나가 한 행이다. 법안 원문이 아니라 그 법의 현행 판본이라, "무엇을 고치려는 법안인가"를 볼 때 조인을 매번 조립하지 않게 한다.
+  -- ⚠️ **'현행'이 '오늘 효력 있음'은 아니다.** 원천이 현행으로 분류한 판본에는 **시행일이 아직 안 온 것**이 섞인다(실측에서 내일 시행되는 형법 판본이 여기 나왔다). `시행대기=1` 인 행이 그것이라, "지금 조문"으로 인용하려면 걸러야 한다: WHERE 시행대기 = 0.
   -- ⚠️ `법령일련번호`(MST)를 노출한다 — 한 법령ID 에 현행 판본이 여럿일 수 있어(`법령` 참조), MST 를 안 보고 세면 같은 조가 판본 수만큼 곱해진다.
-  -- ⚠️ 미매칭 법률안은 여기 없다. 법률안 전체를 보려면 `법률안대상법령` 을 LEFT JOIN 한다.
+  -- ⚠️ **여기 없는 법률안이 두 종류다** — 대상 법령을 못 맞춘 것(미매칭)과, 맞췄지만 그 법에 현행 판본이 없는 것(시행예정만 있는 법). 그래서 여기 0건인 것을 매칭 실패로 읽으면 안 된다. 법률안 전체는 `법률안대상법령` 을 LEFT JOIN 한다.
   SELECT t.의안번호, b.의안명, b.제안일, b.처리결과, b.소관위원회,
          t.법령ID, c.법령명, c.법령일련번호, c.시행대기,
          c.조문번호, c.조문가지번호, c.조문제목, c.전문
@@ -356,8 +357,10 @@ def _DDL(conn: sqlite3.Connection, 표들: tuple[str, ...]) -> tuple[list[str], 
     인덱스 = [r[0] for r in conn.execute(
         f"SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name IN ({자리})"
         " AND sql IS NOT NULL ORDER BY rowid", 표들)]
-    # 뷰는 이름으로 거르지 않고 다 가져온다 — 뷰가 참조하는 표가 `표들` 밖이면 어차피 만들 때
-    # 터지므로, 거르는 대신 터지게 두는 편이 "조용히 빠진 뷰"보다 낫다.
+    # 뷰는 이름으로 거르지 않고 다 가져온다.
+    # ⚠️ **`CREATE VIEW` 는 참조 표가 없어도 성공한다.** 그래서 접는 표를 참조하는 뷰가 원천에
+    #    생기면 스냅샷에 그대로 실리고, 행 수·integrity·FK 검증을 **셋 다 통과한 뒤** 조회할 때에야
+    #    `no such table` 로 터진다. 아래 `_뷰가도는지`(빌드 끝)가 그 자리를 막는다.
     뷰 = [r[0] for r in conn.execute(
         "SELECT sql FROM sqlite_master WHERE type='view' AND sql IS NOT NULL ORDER BY rowid")]
     return 표, 인덱스, 뷰
@@ -387,6 +390,26 @@ def 주석적용(코퍼스: str, ddl: list[str]) -> list[str]:
 
 
 # ── 빌드 ────────────────────────────────────────────────────────────────────
+
+def _뷰가도는지(c: sqlite3.Connection) -> None:
+    """뷰를 하나씩 열어 본다. **`sqlite_master` 에 있는 것과 도는 것은 다르다.**
+
+    `CREATE VIEW` 는 참조 표가 없어도 성공하므로, 접는 표(`수집상태`·`메타`)를 참조하는 뷰가
+    원천에 생기면 행 수·integrity·FK 를 **셋 다 통과한 채** 스냅샷에 실린다. 그 뷰는 의원실이
+    조회하는 순간 `no such table` 로 터지는데, 그때는 이미 오늘 스냅샷이 자리를 차지한 뒤다.
+    """
+    깨진것 = []
+    for (이름, ) in c.execute("SELECT name FROM sqlite_master WHERE type='view'").fetchall():
+        try:
+            c.execute(f'SELECT * FROM "{이름}" LIMIT 0')
+        except sqlite3.Error as e:
+            깨진것.append(f"{이름}: {e}")
+    if 깨진것:
+        raise RuntimeError(
+            "뷰가 참조하는 표가 스냅샷에 없다 — 원천에 새 뷰가 생겼고 그것이 접는 표를"
+            f" 참조한다. `국회표`·`법령표` 에 그 표를 더하거나 뷰를 접어라:\n  "
+            + "\n  ".join(깨진것))
+
 
 def _표복사(대상: sqlite3.Connection, 별칭: str, 표들: tuple[str, ...]) -> dict[str, int]:
     """ATTACH 된 원천에서 표를 통째로 옮긴다. 표별 행 수를 돌려준다."""
@@ -544,6 +567,7 @@ def build(원천국회: Path, 원천법령: Path, 소관기관: Path, 출력: Pa
                 raise RuntimeError(f"integrity_check 실패: {r}")
             if 위반 := c.execute("PRAGMA foreign_key_check").fetchall():
                 raise RuntimeError(f"foreign_key_check {len(위반)}건 위반: {위반[:5]}")
+            _뷰가도는지(c)
         except BaseException:
             c.close()
             임시.unlink(missing_ok=True)

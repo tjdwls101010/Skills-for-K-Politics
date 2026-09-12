@@ -307,3 +307,52 @@ class Test주석에건수가없다:
             "주석에 실측 건수·비율이 있다. **조회로 대체해라** — `SELECT … GROUP BY 1` 한 줄이"
             " 짧으면서 동시에 안 낡는다:\n"
             + "\n".join(f"  {v!r}  ←  {l[:100]}" for v, l in 남은[:10]))
+
+
+class Test뷰검증의구멍:
+    """`CREATE VIEW` 는 참조 표가 없어도 성공한다 — 코덱스 리뷰가 실측으로 잡은 구멍이다.
+
+    접는 표(`수집상태`·`메타`)를 참조하는 뷰가 원천에 새로 생기면, 그 뷰는 스냅샷에 실린 채
+    표별 행 수·`integrity_check`·`foreign_key_check` 를 **셋 다 통과한다.** 조회하는 쪽이
+    `no such table` 을 만나는 것은 그날 스냅샷이 이미 자리를 차지한 뒤다.
+    """
+
+    def test_접는_표를_참조하는_뷰가_원천에_생기면_빌드가_선다(
+            self, tmp_path, 원천국회, 원천법령, 소관기관DB):
+        c = sqlite3.connect(원천국회)
+        c.execute("CREATE VIEW 수집상태요약 AS SELECT 대상, 상태 FROM 수집상태")
+        c.commit()
+        c.close()
+        with pytest.raises(RuntimeError, match="뷰가 참조하는 표가 스냅샷에 없다"):
+            snapshot.build(원천국회, 원천법령, 소관기관DB, tmp_path / "법.db")
+        assert not (tmp_path / "법.db").exists()
+
+    def test_에러가_무엇을_하라를_말한다(self, tmp_path, 원천국회, 원천법령, 소관기관DB):
+        c = sqlite3.connect(원천법령)
+        c.execute("CREATE VIEW 메타요약 AS SELECT 키 FROM 메타")
+        c.commit()
+        c.close()
+        with pytest.raises(RuntimeError) as e:
+            snapshot.build(원천국회, 원천법령, 소관기관DB, tmp_path / "법.db")
+        assert "메타요약" in str(e.value)
+        assert "국회표" in str(e.value) or "법령표" in str(e.value)
+
+
+class Test시행대기가섞인다:
+    """원천이 '현행'으로 분류한 판본에 **시행일이 아직 안 온 것**이 섞인다.
+
+    실측(2026-09-12)에서 `법률안현행조문` 에 다음 날 시행되는 형법 판본이 나왔다. 그래서
+    이 뷰를 통째로 "지금 조문"으로 인용하면 안 되고, 주석이 그걸 말해야 한다.
+    """
+
+    def test_시행대기를_노출한다(self, 빌드):
+        _, conn, _ = 빌드
+        컬럼 = [r[1] for r in conn.execute("PRAGMA table_info(법률안현행조문)")]
+        assert "시행대기" in 컬럼
+
+    def test_주석이_시행대기를_거르라고_말한다(self, 빌드):
+        _, conn, _ = 빌드
+        ddl = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE name='법률안현행조문'").fetchone()[0]
+        assert "시행대기 = 0" in ddl
+        assert "여기 없는 법률안이 두 종류다" in ddl
