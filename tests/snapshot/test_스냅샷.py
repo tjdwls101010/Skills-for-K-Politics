@@ -287,3 +287,23 @@ class TestCLI:
                            capture_output=True, text=True, timeout=60)
         assert r.returncode == 0
         assert "rc 3" in r.stdout
+
+
+class Test주석에건수가없다:
+    """건수는 이 DB 에서 **쓰는 순간부터 낡는다** — 수집이 하루 1회 돌기 때문이다.
+
+    수집기 스키마에는 이미 이 검사가 걸려 있었는데(`tests/*/test_*주석수치.py`), 스냅샷이
+    새로 쓰는 주석과 주석 패치는 그 검사 밖이었다. 같은 DB 를 설명하는 두 표면 중 검사가
+    걸린 쪽만 깨끗해지는 것이 정확히 이 레포에서 한 번 일어난 일이다.
+    """
+
+    def test_스냅샷_스키마_전체에_실측_건수가_없다(self, 빌드):
+        import 주석수치 as 검사기
+        _, conn, _ = 빌드
+        schema = "\n".join(r[0] for r in conn.execute(
+            "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL"))
+        남은 = 검사기.주석수치(schema)
+        assert not 남은, (
+            "주석에 실측 건수·비율이 있다. **조회로 대체해라** — `SELECT … GROUP BY 1` 한 줄이"
+            " 짧으면서 동시에 안 낡는다:\n"
+            + "\n".join(f"  {v!r}  ←  {l[:100]}" for v, l in 남은[:10]))
