@@ -28,7 +28,7 @@ def db_path(explicit: str | os.PathLike[str] | None = None) -> Path:
     if explicit:
         return Path(explicit)
     env = os.environ.get(DB_ENV)
-    return Path(env) if env else SKILL_DIR / "DBs" / "원천" / "법령.db"
+    return Path(env) if env else SKILL_DIR / "DBs" / "LAW.db"
 
 
 def now_kst() -> str:

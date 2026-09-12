@@ -51,7 +51,7 @@ def db_path(explicit: str | os.PathLike[str] | None = None) -> Path:
     if explicit:
         return Path(explicit)
     env = os.environ.get(DB_ENV)
-    return Path(env) if env else SKILL_DIR / "DBs" / "원천" / "국회.db"
+    return Path(env) if env else SKILL_DIR / "DBs" / "CONGRESS.db"
 
 
 SCHEMA = r"""
@@ -75,13 +75,14 @@ CREATE TABLE IF NOT EXISTS 의안 (
     -- ⚠️ NULL = 미수집 또는 원천이 비어 있음.
     처리결과            TEXT,  -- 본회의 최초 심의결과(법률안·비법률안 모두) — NULL = 아직 본회의 심의 전 또는 원천 결측(표결집계에 행이 있는데 NULL 이면 결측).
     -- ⚠️ 재의를 반영하지 않아 원안가결 뒤 거부권으로 부결된 의안도 있다 — 공포 여부는 공포일, 거부권 기록은 의안심사의 '재의'.
-    -- 열린 값 집합의 분포는 audit R1.
+    -- 어떤 값이 오는지는 SELECT DISTINCT 처리결과 로 본다 — 열린 집합이라 목록을 외워 걸면 샌다.
     대안의안번호        TEXT,  -- 이 의안을 흡수한 대안의 번호 — NULL = 관계 없음.
     정부이송일          TEXT,  -- NULL = 미발생 또는 원천값 없음.
     공포일              TEXT,  -- NULL = 미발생 또는 원천값 없음.
     공포법률명          TEXT,  -- ⚠️ 의안명과 다르며 법제처 등 바깥 자료와 대조할 이름이다.
     -- ⚠️ NULL = 공포 전 또는 원천값 없음 — 공포일이 있어도 비어 온 실측이 있다(일괄개정).
-    공포번호            TEXT,  -- NULL = 미발생 또는 원천값 없음.
+    공포번호            TEXT,  -- `LAW.db 법령.공포번호` 와 같은 번호다. NULL = 미발생 또는 원천값 없음.
+    -- ⚠️ **이 번호로 '이 법안이 고친 법'을 정하지 마라** — 일괄개정 하나가 여러 법에 같은 번호를 남긴다. 한 공포번호가 몇 개 법을 가리키는지는 LAW.db 에서 SELECT 공포번호, COUNT(DISTINCT 법령ID) c FROM 법령 WHERE 법종구분='법률' GROUP BY 1 HAVING c>1.
     수집시각            TEXT  -- ⚠️ 의안·의안심사 커밋 시각(KST), NULL = 기록 없음 — 별도 패스인 제안이유·발의자·표결·대안의 수집 완료는 뜻하지 않는다.
 );
 CREATE TABLE IF NOT EXISTS 의안심사 (
@@ -155,16 +156,16 @@ CREATE TABLE IF NOT EXISTS 발언 (
 CREATE TABLE IF NOT EXISTS 회의의안 (
     -- 의안과 회의의 연결 — 같은 의안이 여러 안건으로 올라도 한 행이며 안건 순서는 담지 않는다.
     -- ⚠️ 국정감사는 행이 없어도 정상이며, 간사 선임·업무보고·현안질의·인사청문회 등 의안 아닌 안건은 담지 않는다.
-    -- ⚠️ 위원장 대안은 심사 당일 새 번호를 받아 자기 번호의 연결이 없는 것으로 관측됐다 — 원안 경유는 의안회의, 의안에 없는 번호는 audit R7.
+    -- ⚠️ 위원장 대안은 심사 당일 새 번호를 받아 자기 번호의 연결이 없는 것으로 관측됐다 — 원안 경유는 의안회의.
     회의id      INTEGER NOT NULL REFERENCES 회의(회의id) ON DELETE CASCADE,
-    의안번호    TEXT NOT NULL,  -- 의안에 없는 번호가 포함될 수 있다 — audit R7.
+    의안번호    TEXT NOT NULL,  -- ⚠️ 의안 표에 없는 번호가 섞여 있어 INNER JOIN 이 회의를 조용히 뺀다.
     PRIMARY KEY (회의id, 의안번호)
 );
 CREATE TABLE IF NOT EXISTS 위원회 (
     -- 의안·회의·의원이 참조하는 위원회 이름 차원.
     위원회명    TEXT PRIMARY KEY,  -- ⚠️ 소위원회는 '상위 위원회 + 공백 + 소위명' 형태다(보건복지위원회 법안심사제1소위원회) — 이름의 실제 표기는 위원회명 DISTINCT.
     -- ⚠️ 개편 전후 이름이 함께 남아 새 이름만 걸면 옛 이름으로 회부된 의안이 빠진다.
-    상위위원회  TEXT REFERENCES 위원회(위원회명)  -- ⚠️ NULL = 소위 아님 또는 상위 미상 — 상위 없이 등록된 '…소위' 별칭도 있다(audit R18).
+    상위위원회  TEXT REFERENCES 위원회(위원회명)  -- ⚠️ NULL = 소위 아님 또는 상위 미상 — 상위 없이 등록된 '…소위' 별칭도 있다.
 );
 CREATE TABLE IF NOT EXISTS 의원 (
     -- 22대를 거쳐 간 전원 — 사퇴·의원직 상실로 떠난 사람의 발의·표결·발언도 참조한다.
@@ -172,7 +173,7 @@ CREATE TABLE IF NOT EXISTS 의원 (
     이름        TEXT NOT NULL,  -- ⚠️ 동명이인이 실재해 조인 키가 아니다 — 이름으로 집계하면 서로 다른 사람이 접힌다.
     정당        TEXT,  -- 현직 API에서 마지막으로 확인한 정당 — 확인한 적 없는 전직은 원천이 준 대수별 값, NULL = 원천값 없음.
     -- 표결 당시 당적은 담지 않는다.
-    정당확인일  TEXT,  -- 현직 API에서 정당을 마지막으로 확인한 날짜 — NULL = 확인한 적 없음(대개 전직, 정당은 원천이 준 대수별 값), 현직의 확인 지연은 audit R17.
+    정당확인일  TEXT,  -- 현직 API에서 정당을 마지막으로 확인한 날짜 — NULL = 확인한 적 없음(대개 전직, 정당은 원천이 준 대수별 값), 현직인데도 확인일이 오래됐으면 정당이 옛 값일 수 있다.
     선거구      TEXT,  -- 비례대표는 '비례대표'(NULL 아님) — NULL = 원천값 없음.
     현직여부    INTEGER NOT NULL DEFAULT 1  -- 0인 사람도 발의·표결·발언을 가지며 조회에서 빼면 그 이력이 사라진다.
 );
@@ -186,7 +187,7 @@ CREATE TABLE IF NOT EXISTS 수집상태 (
     -- 수집 패스의 결과와 현재 상태의 시작 시점.
     대상        TEXT NOT NULL,  -- '의원위원회' | '의원현직' | '감사'
     키          TEXT NOT NULL,  -- 현재 '전체'.
-    상태        TEXT NOT NULL CHECK (상태 IN ('완료','건너뜀')),  -- ⚠️ '건너뜀'이면 그 대상(현직여부·정당·위원회 배정)은 옛 값을 그대로 들고 있다 — 상태 지속 기간은 audit R14.
+    상태        TEXT NOT NULL CHECK (상태 IN ('완료','건너뜀')),  -- ⚠️ '건너뜀'이면 그 대상(현직여부·정당·위원회 배정)은 옛 값을 그대로 들고 있다 — 상태시작일시가 그 상태가 시작된 때다.
     건수        INTEGER,  -- 명부 대상은 원천 행수, '감사'는 위반한 게이트 수 — NULL = 기록 없음.
     상세        TEXT,  -- NULL = 상세 기록 없음.
     갱신일시    TEXT NOT NULL,
@@ -201,7 +202,7 @@ CREATE TABLE IF NOT EXISTS 수집실패 (
     대상키      TEXT NOT NULL,  -- 의안번호·회의id·의원코드.
     실패종류    TEXT NOT NULL CHECK (실패종류 IN ('재시도','없음','막힘','보류')),  -- '없음' = 다시 물어도 같은 답 — 원천에 없거나(404·INFO-200) 풀 정보가 없다(발언의원).
     -- '막힘' = 원천은 주지만 저장할 수 없음.
-    -- '보류' = 사람이 확인하고 더는 묻지 않기로 한 자료 — audit A11에서는 빠지고 R6에 남으며 완결성의 한계다.
+    -- '보류' = 사람이 더는 묻지 않기로 한 자료라 다음 수집이 메우지 않는다 — 그만큼 완결성의 한계다.
     상세        TEXT,  -- NULL = 상세 기록 없음.
     시도횟수    INTEGER NOT NULL DEFAULT 0,
     마지막시도  TEXT,  -- NULL = 시도 시각 기록 없음.
@@ -243,7 +244,7 @@ CREATE VIEW 법률안제안주체 AS
 DROP VIEW IF EXISTS 의안회의;
 CREATE VIEW 의안회의 AS
   -- 의안이 안건으로 오른 회의 — 의안 아닌 안건의 범위는 회의의안과 같다.
-  -- ⚠️ 자기 번호의 회의 연결이 없는 것으로 관측된 위원장 대안은 원안경유로 연결한다 — 회의의안의 미해소 번호는 audit R7.
+  -- ⚠️ 자기 번호의 회의 연결이 없는 것으로 관측된 위원장 대안은 원안경유로 연결한다.
   -- ⚠️ 원안 여럿이 같은 회의를 거치면 행이 여럿이다.
   SELECT h.의안번호, h.의안번호 AS 경유의안번호, h.회의id, m.회의종류, m.위원회명,
          m.회의일자, '직접' AS 경로
@@ -253,6 +254,18 @@ CREATE VIEW 의안회의 AS
     FROM 의안 d JOIN 회의의안 h ON h.의안번호 = d.의안번호
                 JOIN 회의 m USING (회의id)
    WHERE d.대안의안번호 IS NOT NULL;
+
+DROP VIEW IF EXISTS 신선도;
+CREATE VIEW 신선도 AS
+  -- **이 답은 언제 기준인가.** 항상 한 행이다 — 빈 DB 에서도 값이 NULL 인 한 행이 온다.
+  -- 사용자가 "지금 어떻게 되어 있나"를 물을 때 그 '지금'이 며칠 전인지 모르면 낡은 시점의 답을 오늘 것인 양 내놓게 된다. 그래서 시점을 묻는 질의는 여기서 끝난다.
+  SELECT (SELECT MAX(수집시각) FROM 의안) AS 적재기준시각,  -- 마지막으로 자료를 받은 시각(KST). NULL = 받은 기록이 없다.
+         CASE WHEN g.상태 IS NULL THEN NULL WHEN g.상태 = '완료' AND COALESCE(g.건수, 0) = 0 THEN 1 ELSE 0 END AS 감사통과,  -- 1 = 게이트를 다 통과. NULL = 감사 기록 없음. **0 = 위반이 남아 있었다** — 이 DB 를 근거로 답할 때는 감사상세의 게이트가 무엇을 재는지 확인하거나, 못 하면 그 한계를 답에 밝힌다.
+         g.갱신일시 AS 감사시각,  -- ⚠️ **그 감사가 언제 것인가.** 감사는 수집이 돌 때만 기록되므로 수집이 며칠 멈췄으면 이 시각도 그만큼 옛것이고, 적재기준시각과 벌어져 있으면 그 사이의 적재는 감사를 안 거쳤다.
+         COALESCE(g.상세, CASE WHEN g.건수 > 0 THEN '게이트 위반 ' || g.건수 || '건' END) AS 감사상세,  -- 위반한 게이트와 건수. NULL = 위반 없음 또는 기록 없음.
+         (SELECT CASE WHEN COUNT(*) > 0 THEN '마지막 수집이 ' || group_concat(대상, '·') || ' 를 건너뛰었다 — 정당·현직여부·위원회 배정이 옛 값일 수 있다. 발의·표결·발언 이력은 영향받지 않는다.' END
+            FROM 수집상태 WHERE 상태 = '건너뜀') AS 경고  -- ⚠️ **어느 부분이 옛 값인가**를 문장으로. NULL = 그런 부분 없음.
+    FROM (SELECT 1) LEFT JOIN 수집상태 g ON g.대상 = '감사' AND g.키 = '전체';
 """
 
 
@@ -1323,7 +1336,7 @@ def _main(argv: list[str] | None = None) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(description=__doc__)
-    db도움 = f"DB 파일 경로. 기본값: ${DB_ENV} 또는 {{skill_dir}}/DBs/원천/국회.db"
+    db도움 = f"DB 파일 경로. 기본값: ${DB_ENV} 또는 {{skill_dir}}/DBs/CONGRESS.db"
     ap.add_argument("--db", help=db도움)
     명령들 = ap.add_subparsers(dest="command", required=True)
     schema = 명령들.add_parser(

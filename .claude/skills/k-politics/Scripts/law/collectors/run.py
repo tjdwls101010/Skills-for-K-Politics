@@ -167,7 +167,7 @@ def _결과쓰기(경로, 곁기록) -> None:
   ① 코드만 복사            조회 불가. collect.py 가 DB 를 만든다 (OC 는 환경변수 LAW_API_KEY → .env → 기본값)
   ② 기존 DB 와 함께        조회 가능. 조회.py --스키마 첫 줄이 어느 파일을 열었는지 절대경로로 말한다
   ③ 새 DB 수집             전량 수 시간. 인증키 없이도 기본 OC 로 돈다. 백업 계약은 아래
-  ④ 구버전 DB 업그레이드   백업 사본을 cp 했으면 `chmod u+w 법령.db` 먼저(사본은 0444 다). load.py migrate 앞에
+  ④ 구버전 DB 업그레이드   백업 사본을 cp 했으면 `chmod u+w LAW.db` 먼저(사본은 0444 다). load.py migrate 앞에
                            24시간 이내 검증된 백업이 있어야 한다 — 이 레포에선 **스킬 폴더에서**
                            `uv run Scripts/backup.py law --이행직전`. 없으면 migrate 가 거부한다 (숨기지 않는다)
 

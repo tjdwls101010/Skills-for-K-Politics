@@ -182,8 +182,8 @@ class Test연결:
 
     def test_환경변수가_없으면_스킬_디렉터리다(self, monkeypatch):
         monkeypatch.delenv("LAW_DB", raising=False)
-        assert 연결.db_path().name == "법령.db"
-        assert 연결.db_path().parent.name == "원천"
+        assert 연결.db_path().name == "LAW.db"
+        assert 연결.db_path().parent.name == "DBs"
 
 
 def _법령(일련="270351", 명="개인정보 보호법", 연혁="현행"):

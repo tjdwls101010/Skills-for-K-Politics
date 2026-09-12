@@ -32,8 +32,8 @@ def 명령들(글: str) -> list[str]:
 
 @pytest.mark.parametrize(
     "이름,환경변수,DB",
-    [("국회", "CONGRESS_DB", ".claude/skills/k-politics/DBs/원천/국회.db"),
-     ("법령", "LAW_DB", ".claude/skills/k-politics/DBs/원천/법령.db")],
+    [("국회", "CONGRESS_DB", ".claude/skills/k-politics/DBs/CONGRESS.db"),
+     ("법령", "LAW_DB", ".claude/skills/k-politics/DBs/LAW.db")],
 )
 def test_수집이_운영_DB를_겨눈다(이름, 환경변수, DB):
     """레포 디렉터리를 옮긴 날 옛 절대경로를 계속 겨누면 수집은 DB 점검에서 멈춘다."""
@@ -304,33 +304,31 @@ def test_권한을_명시한다(p):
 
 
 @pytest.mark.parametrize("이름", sorted(수집들))
-def test_스냅샷_입력과_로그가_연결된다(이름):
+def test_수집기_DB_경로가_env_에_박혀_있다(이름):
     import yaml
 
     잡 = yaml.safe_load(본문(수집들[이름]))["jobs"]["collect"]
-    for 키, 파일 in (("CONGRESS_DB", "국회.db"), ("LAW_DB", "법령.db")):
-        assert 잡["env"][키] == str(운영루트 / ".claude/skills/k-politics/DBs/원천" / 파일)
-    스텝들 = 잡["steps"]
-    스냅샷 = next(s for s in 스텝들 if s.get("id") == "snapshot")
-    assert 스냅샷["if"] == "steps.collect.outputs.code == '0' || steps.collect.outputs.code == '1'"
-    assert "set +e" in 스냅샷["run"] and "set -o pipefail" in 스냅샷["run"]
-    for 조각 in ('--원천국회 "$CONGRESS_DB"', '--원천법령 "$LAW_DB"', '--소관기관 .claude/skills/k-politics/DBs/소관기관.db', '--출력 .claude/skills/k-politics/DBs/법.db', '| tee snapshot.txt', 'echo "code=$?" >> "$GITHUB_OUTPUT"'):
-        assert 조각 in 스냅샷["run"]
-    아티팩트 = next(s for s in 스텝들 if "actions/upload-artifact@" in s.get("uses", ""))
-    assert "snapshot.txt" in 아티팩트["with"]["path"].splitlines()
-    assert 스텝들.index(스냅샷) < 스텝들.index(아티팩트)
+    for 키, 파일 in (("CONGRESS_DB", "CONGRESS.db"), ("LAW_DB", "LAW.db")):
+        assert 잡["env"][키] == str(운영루트 / ".claude/skills/k-politics/DBs" / 파일)
 
 
 @pytest.mark.parametrize("이름", sorted(수집들))
-@pytest.mark.parametrize("수집,스냅샷,예상,경고", [("0", "0", 0, False), ("0", "1", 1, False), ("0", "3", 0, True), ("1", "3", 1, True), ("1", "0", 1, False), ("3", "", 0, True), ("0", "", 1, False)])
-def test_스냅샷_실패와_락_경고가_최종_종료코드에_반영된다(이름, 수집, 스냅샷, 예상, 경고):
+def test_스냅샷_층이_남아_있지_않다(이름):
+    """조회는 수집기 DB 파일을 직접 읽는다 — 중간 스냅샷을 만드는 스텝도, 그 판정을
+    종료코드로 전파하는 분기도 없다. 남아 있으면 없는 빌더를 부르는 잡이 된다."""
+    assert "snapshot" not in 본문(수집들[이름])
+
+
+@pytest.mark.parametrize("이름", sorted(수집들))
+@pytest.mark.parametrize("수집,예상,경고", [("0", 0, False), ("1", 1, False), ("3", 0, True)])
+def test_수집_종료코드와_락_경고가_최종_종료코드에_반영된다(이름, 수집, 예상, 경고):
     import subprocess
     import yaml
 
     스텝들 = yaml.safe_load(본문(수집들[이름]))["jobs"]["collect"]["steps"]
     판정 = next(s for s in 스텝들 if s.get("name") == "판정 전파")
     assert 판정["if"] == "always()"
-    값들 = {"preflight.outcome": "success", "verify.outputs.code": "0", "collect.outputs.code": 수집, "snapshot.outputs.code": 스냅샷}
+    값들 = {"preflight.outcome": "success", "verify.outputs.code": "0", "collect.outputs.code": 수집}
 
     def 치환(m):
         식 = m[1].strip().removeprefix("steps.")

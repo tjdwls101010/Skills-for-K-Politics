@@ -1,7 +1,7 @@
 """`SKILL.md` — 이 레포가 실제로 배포하는 것.
 
 여기서 재는 것은 산문의 품질이 아니라 **조용히 깨질 수 있는 계약**이다: 프론트매터가 유효한가,
-본문의 sqlite3 명령이 안전한 모양인가, 주입 명령이 스킬을 통째로 못 쓰게 만들 수 있는가,
+본문의 sqlite3 명령이 안전한 모양인가, 로드가 값을 문서로 복사하지 않는가,
 description 이 트리거 경계를 담고 있는가. 산문의 품질은 e2e 가 잰다.
 """
 
@@ -24,6 +24,10 @@ def 프론트매터(글):
     m = re.match(r"^---\n(.*?)\n---\n", 글, re.S)
     assert m, "프론트매터가 `---` 로 열고 닫혀야 한다"
     return m.group(1)
+
+
+def 프론트매터_고정():
+    return re.match(r"^---\n(.*?)\n---\n", 스킬.read_text(encoding="utf-8"), re.S).group(1)
 
 
 @pytest.fixture(scope="module")
@@ -52,40 +56,38 @@ class Test프론트매터:
         d = 프론트매터
         assert "News" in d and "KOSIS" in d
 
-    def test_allowed_tools_가_주입_명령을_덮는다(self, 프론트매터, 본문):
-        """**주입 명령은 권한 프롬프트를 안 띄운다.** allow 규칙이 없으면 그냥 실패하고,
-        0 아닌 종료 코드는 에러 한 줄이 아니라 **스킬 호출 전체를 중단**시킨다 — 클로드가
-        본문을 통째로 못 받는다(2026-09-12 문서 확인). 계획의 D13("allowed-tools 없음")이
-        이 실측으로 뒤집힌 자리다."""
+    def test_allowed_tools_가_본문의_레시피를_덮는다(self):
+        """allow 규칙이 없으면 조회마다 권한 프롬프트가 뜬다. `${CLAUDE_SKILL_DIR}` 는
+        프론트매터에서도 치환되므로 `DBs/` 아래를 `*` 둘로 덮으면 네 파일이 다 들어온다
+        (실측 2026-09-12: `-box` 유무 두 규칙으로 로드와 조회가 프롬프트 없이 통과)."""
+        import fnmatch
+
         yaml = pytest.importorskip("yaml")
-        허용 = yaml.safe_load(프론트매터)["allowed-tools"]
-        for 주입 in re.findall(r"^!`(.+?)`$", 본문, re.M):
-            앞 = 주입.split('"')[0].strip()      # 'sqlite3 -box' 또는 'sqlite3'
-            db = re.search(r"DBs/([^?]+)\?([^\"]*)", 주입)
-            assert db, 주입
-            패턴 = f'{앞} "file:${{CLAUDE_SKILL_DIR}}/DBs/{db.group(1)}?{db.group(2)}"'
-            assert 패턴 in 허용, f"allow 규칙이 이 주입을 안 덮는다:\n  {패턴}"
+        규칙 = [m.group(1) for m in re.finditer(r"Bash\((.+?)\)(?:,|$)",
+                                              yaml.safe_load(프론트매터_고정())["allowed-tools"])]
+        assert 규칙
+        for 앞 in ('sqlite3 -box', 'sqlite3'):
+            명령 = f'{앞} "file:${{CLAUDE_SKILL_DIR}}/DBs/CONGRESS.db?mode=rw" "PRAGMA query_only=1; SELECT 1"'
+            assert any(fnmatch.fnmatchcase(명령, 하나 if 하나.endswith("*") else 하나 + "*")
+                       for 하나 in 규칙), f"allow 규칙이 이 모양을 안 덮는다:\n  {명령}"
 
 
-class Test주입명령:
-    def test_모든_주입에_폴백이_있다(self, 본문):
-        """sqlite3 는 DB 가 없거나 잠기면 비영으로 죽고, 그러면 스킬 자체가 안 열린다.
-        `|| echo` 가 그 실패를 **본문 안의 한 줄**로 낮춘다 — 코퍼스가 없다는 것을 클로드가
-        알면서도 나머지 규율은 받는다."""
+class Test로드비용:
+    """**로드 시 조회를 주입하지 않는다.** 주입은 매 로드마다 값을 문서로 복사하는 것이고,
+    그 값을 모델 대신 확인해 주는 레일이다.
+
+    되돌리려면 이 측정을 뒤집어야 한다(2026-09-12, `run_e2e.py`): 본문 한 문장만 두고
+    "22대 가상자산 법안" 을 물었더니 모델의 **두 번째 도구 호출이 `SELECT * FROM 신선도`**
+    였고 적재기준시각이 답에 붙었다. 모델이 스스로 읽으므로 주입이 살 이유가 없었다.
+    """
+
+    def test_주입이_없다(self, 본문):
         주입 = re.findall(r"^!`(.+?)`$", 본문, re.M)
-        assert 주입, "로드 시 주입이 하나도 없다"
-        for 명령 in 주입:
-            assert "2>&1" in 명령, f"stderr 를 안 삼킨다: {명령}"
-            assert "|| echo" in 명령, f"폴백이 없다 — 실패하면 스킬이 통째로 안 열린다: {명령}"
+        assert 주입 == [], f"로드 시 조회가 남아 있다: {주입}"
 
-    def test_폴백_문구가_무엇을_하라를_말한다(self, 본문):
-        for 명령 in re.findall(r"^!`(.+?)`$", 본문, re.M):
-            폴백 = 명령.split("|| echo", 1)[1]
-            assert len(폴백) > 30, f"폴백이 상태만 말하고 대안을 안 준다: {폴백}"
-
-    def test_신선도를_주입한다(self, 본문):
-        """본문에 날짜를 적으면 낡는다. 매일 바뀌는 것만 DB 에서 읽어 온다."""
-        assert "FROM 신선도" in 본문
+    def test_신선도를_읽으라고_말한다(self, 본문):
+        """본문에 날짜를 적으면 낡는다. 시점은 DB 가 갖고, 본문은 언제 그것이 중요한지만 갖는다."""
+        assert "`신선도`" in 본문
 
 
 class TestDB경계:
@@ -95,17 +97,19 @@ class TestDB경계:
         명령들 = re.findall(r"sqlite3 [^\n]*", 본문)
         assert 명령들
         for 명령 in 명령들:
-            if "<SQL>" not in 명령 and "!`" not in f"!`{명령}":
-                pass
             assert "file:" in 명령, f"URI 가 아니다: {명령}"
-            assert ("mode=ro&immutable=1" in 명령
-                    or ("mode=rw" in 명령 and "query_only" in 본문)), f"안전하지 않다: {명령}"
+            assert "mode=rw" in 명령 and "query_only" in 본문, f"안전하지 않다: {명령}"
 
-    def test_원천을_열지_않는다(self, 본문):
-        """`DBs/원천/` 은 수집기가 쓰는 라이브 파일이다."""
-        for 명령 in re.findall(r"sqlite3 [^\n]*", 본문):
-            assert "원천/" not in 명령
-        assert "`DBs/원천/`은" in 본문, "열지 않는다는 것을 본문이 말해야 한다"
+    def test_네_파일을_이름으로_부른다(self, 본문):
+        """파일이 곧 코퍼스다 — 어느 파일에 무엇이 있는지는 이름과 3절 한 문장이 진다."""
+        for 파일 in ("NEWS.db", "CONGRESS.db", "LAW.db", "AGENCIES.db"):
+            assert 파일 in 본문, 파일
+
+    def test_사라진_층의_이름이_남아_있지_않다(self, 본문):
+        """`법.db` 도 `DBs/원천/` 도 없다. `immutable=1` 은 라이브 DB 에서 최근 커밋이 빠진
+        것을 읽게 하므로 이 레시피에 없다."""
+        for 말 in ("법.db", "원천/", "immutable"):
+            assert 말 not in 본문, 말
 
     def test_행_수_상한을_원리로_막는다(self, 본문):
         """래퍼가 없어 LIMIT 이 강제되지 않는다. 막는 것은 이 문장뿐이다."""
@@ -122,8 +126,8 @@ class Test본문경계:
         assert 알려진
 
     def test_수집_파이프라인_이야기가_없다(self, 본문):
-        """독자는 의원실 일을 하는 클로드다. 수집·백업·스냅샷 빌드·워크플로는 한 줄도 없다."""
-        for 말 in ("워크플로", "GitHub Actions", "러너", "백업", "수집 주기", "snapshot.py"):
+        """독자는 의원실 일을 하는 클로드다. 수집·백업·워크플로는 한 줄도 없다."""
+        for 말 in ("워크플로", "GitHub Actions", "러너", "백업", "수집 주기"):
             assert 말 not in 본문, 말
 
     def test_의원실_정체성이_본문에_있다(self, 본문):
@@ -157,7 +161,7 @@ class Test본문이스키마를베끼지않는다:
     본문은 매 로드마다 컨텍스트를 먹는데 스키마는 필요할 때만 읽힌다.
 
     한 번 어겼다 — "감사통과가 0이면 …" 문단을 본문에 넣었는데, 그 지식의 자리는 그 컬럼의
-    주석이다(`snapshot.py` 의 `신선도.감사통과`). 읽는 사람은 이미 거기 있다.
+    주석이다(수집기 SCHEMA 의 `신선도` 뷰). 읽는 사람은 이미 거기 있다.
     """
 
     def test_컬럼의_의미를_본문이_설명하지_않는다(self, 본문):
@@ -166,7 +170,7 @@ class Test본문이스키마를베끼지않는다:
                 f"{컬럼} 의 뜻은 `.schema` 가 말한다 — 본문에 옮겨 적으면 두 곳이 갈린다")
 
     def test_표_이름_목록을_본문에_적지_않는다(self, 본문):
-        """목록은 로드 시 주입한다. 적어 두면 스냅샷이 표를 늘린 날 낡는다."""
+        """목록은 `sqlite_master` 가 갖는다. 적어 두면 수집기가 표를 늘린 날 낡는다."""
         코드밖 = 본문.split("```")[0] + "".join(본문.split("```")[2::2])
         적힌것 = [t for t in ("의안심사", "표결집계", "회의의안", "조문요소", "의율조문",
                             "행정규칙조문", "인용판례", "법률안제안주체", "조문판단수")

@@ -56,3 +56,25 @@ def test_스키마_문자수가_기준선을_넘지_않는다(conn):
 def test_과장을_낳는_표제가_없다():
     for 말 in ("한 번도 판단받지", "한 번도 시험받지", "시험받지 않은 규정"):
         assert 말 not in 스키마.SCHEMA, 말
+
+
+import pytest
+
+
+@pytest.mark.parametrize("좌표", [r"audit [AR]\d+", r"감사 [AR]\d+", "정리 유예"])
+def test_관리자_좌표를_가리키지_않는다(좌표):
+    """읽는 사람은 의원실 일을 하는 클로드다 — `audit.py` 를 돌리는 관리자가 아니다.
+    게이트 번호는 그 번호를 아는 사람에게만 뜻이 있으니 원리로 바꾼다."""
+    남음 = [줄 for 줄 in 스키마.SCHEMA.splitlines() if re.search(좌표, 줄)]
+    assert 남음 == [], "\n".join(남음)
+
+
+def test_열린_값_집합은_확인하는_법으로_말한다():
+    assert "SELECT DISTINCT 위임구분" in 스키마.SCHEMA
+
+
+def test_수집실패_포인터가_원천_컬럼_이름을_쓴다():
+    """`대상종류` 는 사라진 스냅샷 통합표의 이름이었다 — 이 DB 의 컬럼은 `자료종류` 다.
+    없는 컬럼을 가리키는 포인터는 따라간 사람을 `no such column` 으로 보낸다."""
+    assert "수집실패의 자료종류='위임행정규칙'" in 스키마.SCHEMA
+    assert "대상종류" not in 스키마.SCHEMA
